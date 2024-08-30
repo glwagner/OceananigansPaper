@@ -49,7 +49,7 @@ zF⁺ = znodes(w′²)[1:128] .* Re
 fig = Figure()
 ax  = Axis(fig[1, 1], title = "Mean flow", xscale = log10)
 lines!(axm zC⁺, view(U, 1, 1, 1:128))
-ax  = Axis(fig[1, 1], title = "Turbulent statistics") 
+ax  = Axis(fig[1, 1], title = "Turbulent statistics", xscale = log10) 
 lines!(ax, zC⁺, view(u′², 1, 1, 1:128), label = "u′²")
 lines!(ax, zC⁺, view(v′², 1, 1, 1:128), label = "v′²")
 lines!(ax, zF⁺, view(w′², 1, 1, 1:128), label = "w′²")
