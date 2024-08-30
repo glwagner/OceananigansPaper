@@ -1,3 +1,5 @@
 [deps]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Oceananigans = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
+Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
+SeawaterPolynomials = "d496a93d-167e-4197-9f49-d3af4ff8fe40"
