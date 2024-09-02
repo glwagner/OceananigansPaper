@@ -1,10 +1,12 @@
 using Oceananigans
 
+chebychev_spaced_z_faces(k) = - cos(π * (k - 1) / Nz)
+
 grid = RectilinearGrid(GPU(),
                        size=(512, 256, 256),
-                       x = (0, 4π)
-                       y = (-π, π)
-                       z = (-1, 1)
+                       x = (0, 4π),
+                       y = (-π, π),
+                       z = chebychev_spaced_z_faces,
                        topology = (Periodic, Periodic, Bounded))
 
 no_slip = ValueBoundaryCondition(0)
