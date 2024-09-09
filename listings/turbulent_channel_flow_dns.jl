@@ -1,34 +1,37 @@
 using Oceananigans
 
-chebychev_spaced_z_faces(k) = - cos(π * (k - 1) / Nz)
+Nx = 256
+Ny = 64
+Nz = 128
 
-grid = RectilinearGrid(GPU(),
-                       size=(512, 256, 256),
-                       x = (0, 4π),
-                       y = (-π, π),
-                       z = chebychev_spaced_z_faces,
-                       topology = (Periodic, Periodic, Bounded))
+ϵ = 1 # stretching parameter (↑↑ ⟹  more stretching)
+ζ(k) = 2/Nz * (k - 1) - 1 # ζ ∈ [-1, 1]
+z(k) = tanh(ϵ * ζ(k)) / tanh(ϵ)
 
-no_slip = ValueBoundaryCondition(0)
-u_bcs = FieldBoundaryConditions(top=no_slip, bottom=no_slip)
-v_bcs = FieldBoundaryConditions(top=no_slip, bottom=no_slip)
-boundary_conditions = (u=u_bcs, v=v_bcs)
+grid = RectilinearGrid(CPU(); topology = (Periodic, Periodic, Bounded),
+                       size=(Nx, Ny, Nz), x = (0, 4π), y = (-π, π), z)
 
 Re = 180
-forcing = (; u=1)
 closure = ScalarDiffusivity(ν=1/Re)
+
+Px = 1 # mean x-direction pressure gradient
+forcing = (; u=Px)
+
+no_slip = ValueBoundaryCondition(0)
+uv_bcs = FieldBoundaryConditions(top=no_slip, bottom=no_slip)
+boundary_conditions = (u=uv_bcs, v=uv_bcs)
+
 model = NonhydrostaticModel(; grid, closure, boundary_conditions, forcing)
 
 u₀(x, y, z) = 30 * (1 - z^2)
-v₀(x, y, z) = rand() * 0.001
-w₀(x, y, z) = rand() * 0.001
+v₀(x, y, z) = 1e-3 * randn()
+w₀(x, y, z) = 1e-3 * randn()
+set!(model, u=u₀, v=v₀, w=w₀)
 
-set!(model, u = u₀, v = v₀, w = w₀)
-
-simulation = Simulation(model, Δt=1e-4, stop_time=5)
-
+simulation = Simulation(model, Δt=1e-4, stop_iteration=10)
 run!(simulation)
 
+#=
 # Probably we need to average in time.
 # If results are ok with just space average we can keep them.
 u, v, w = model.velocities
@@ -55,7 +58,4 @@ ax  = Axis(fig[1, 1], title = "Turbulent statistics", xscale = log10)
 lines!(ax, zC⁺, view(u′², 1, 1, 1:128), label = "u′²")
 lines!(ax, zC⁺, view(v′², 1, 1, 1:128), label = "v′²")
 lines!(ax, zF⁺, view(w′², 1, 1, 1:128), label = "w′²")
-
-
-
-
+=#
