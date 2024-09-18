@@ -6,13 +6,11 @@ using Oceananigans.TurbulenceClosures:
     RiBasedVerticalDiffusivity
 
 function run_vertical_mixing_simulation(closure)
-    Jb = 1e-7
     τx = -5e-4
     N² = 1e-5
 
     grid = RectilinearGrid(size=50, z=(-200, 0), topology=(Flat, Flat, Bounded))
 
-    b_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Jb))
     u_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(τx))
 
     if closure isa CATKEVerticalDiffusivity
@@ -24,13 +22,13 @@ function run_vertical_mixing_simulation(closure)
     end
 
     model = HydrostaticFreeSurfaceModel(; grid, closure, tracers,
-                                        boundary_conditions = (; b=b_bcs, u=u_bcs),
+                                        boundary_conditions = (; u=u_bcs),
                                         buoyancy = BuoyancyTracer())
 
     bᵢ(z) = N² * z
     set!(model, b=bᵢ)
 
-    simulation = Simulation(model, Δt=1minute, stop_time=24hours)
+    simulation = Simulation(model, Δt=10, stop_time=24hours)
     run!(simulation)
 
     return simulation
@@ -42,10 +40,12 @@ closures = Dict("CATKE" => CATKEVerticalDiffusivity(),
 
 using GLMakie
 
-fig = Figure(size=(800, 600))
+set_theme!(Theme(linewidth=3, linealpha=0.6))
+
+fig = Figure(size=(800, 400))
 axb = Axis(fig[1, 1], xlabel="Buoyancy (m s⁻²)", ylabel="z (m)")
 axu = Axis(fig[1, 2], xlabel="x-velocity (m s⁻¹)", ylabel="z (m)")
-axκ = Axis(fig[1, 3], xlabel="Tracer diffusivity (m² s⁻¹)", ylabel="z (m)")
+axκ = Axis(fig[1, 3], xlabel="Tracer diffusivity (m² s⁻¹)", ylabel="z (m)", yaxisposition=:right)
 
 for (name, closure) in closures
     sim = run_vertical_mixing_simulation(closure)
@@ -55,5 +55,13 @@ for (name, closure) in closures
 end
 
 axislegend(axb, position=:lt)
+
+hidespines!(axb, :t, :r)
+hidespines!(axu, :t, :r, :l)
+hidespines!(axκ, :t, :l)
+
+hideydecorations!(axu, grid=false)
+
 display(fig)
+save("vertical_mixing_parameterizations.png", fig)
 

@@ -1,4 +1,3 @@
-#=
 using Oceananigans
 
 const δ = 10
@@ -47,7 +46,6 @@ simulation.output_writers[:jld2] = JLD2OutputWriter(model, outputs; filename,
                                                     overwrite_existing = true)
 
 run!(simulation)
-=#
 
 u, v, w = model.velocities
 t = time(simulation)
