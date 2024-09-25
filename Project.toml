@@ -1,7 +1,6 @@
 [deps]
 CFTime = "179af706-886a-5703-950a-314cd64e0468"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
-ClimaOcean = "0376089a-ecfe-4b0e-a64f-9c555d74d754"
 Oceananigans = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
 OrthogonalSphericalShellGrids = "c2be9673-fb75-4747-82dc-aa2bb9f4aed0"
 Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
