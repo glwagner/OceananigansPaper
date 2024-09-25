@@ -4,15 +4,15 @@ using GLMakie
 
 fig = Figure(size=(1000, 400))
 axκ = Axis(fig[1, 1], xlabel="Tracer diffusivity", ylabel="z")
-axc = Axis(fig[1, 2], xlabel="Tracer distribution at t=10", ylabel="z", yaxisposition=:right)
+axc = Axis(fig[1, 2], xlabel="Tracer distribution", ylabel="z", yaxisposition=:right)
 
-for (Δt, time_discretization) in [(10,   ExplicitTimeDiscretization()),
+for (Δt, time_discretization) in [(0.5,  ExplicitTimeDiscretization()),
                                   (1e-4, ExplicitTimeDiscretization()),
-                                  (10,   VerticallyImplicitTimeDiscretization())]
+                                  (0.5,  VerticallyImplicitTimeDiscretization())]
 
-    grid = RectilinearGrid(size=200, z=(-5, 5), topology=(Flat, Flat, Bounded))
+    grid = RectilinearGrid(size=20, z=(-2, 2), topology=(Flat, Flat, Bounded))
 
-    κ(z, t) = exp(-z^2)
+    κ(z, t) = abs(z) < 1
     closure = VerticalScalarDiffusivity(time_discretization; κ)
 
     model = HydrostaticFreeSurfaceModel(; grid, closure, tracers=:c,
@@ -21,7 +21,7 @@ for (Δt, time_discretization) in [(10,   ExplicitTimeDiscretization()),
     cᵢ(z) = z
     set!(model, c=cᵢ)
 
-    simulation = Simulation(model; Δt, stop_time=10)
+    simulation = Simulation(model; Δt, stop_time=0.5)
     run!(simulation)
     label = string(summary(time_discretization), ", Δt=", Δt)
     lines!(axc, model.tracers.c; label)
@@ -35,11 +35,15 @@ for (Δt, time_discretization) in [(10,   ExplicitTimeDiscretization()),
     end
 end
 
-Legend(fig[1, 3], axc)
+Legend(fig[1, 3], axc, framevisible=false)
 display(current_figure())
 
 hidespines!(axκ, :t, :r)
 hidespines!(axc, :t, :l)
+
+xlims!(axc, -2, 2)
+ylims!(axc, -2, 2)
+ylims!(axκ, -2, 2)
 
 save("vertically_implicit_diffusion.png", fig)
 
