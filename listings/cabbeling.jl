@@ -3,8 +3,8 @@ using Oceananigans.Models: seawater_density
 using SeawaterPolynomials: TEOS10EquationOfState
 
 grid = RectilinearGrid(GPU(),
-                       size = (1024, 1024),
-                       x = (0, 0.5),
+                       size = (4096, 1024),
+                       x = (0, 2),
                        z = (-0.5, 0.0),
                        topology = (Bounded, Flat, Bounded))
 
@@ -38,13 +38,15 @@ T = model.tracers.T
 
 output_writer = JLD2OutputWriter(model, (; ρ, T),
                                  filename = "cabbeling",
-                                 schedule = TimeInterval(0.5),
+                                 schedule = TimeInterval(10),
+                                 #schedule = TimeInterval(1),
                                  overwrite_existing = true)
                                         
 simulation.output_writers[:jld2] = output_writer
 
 run!(simulation)
 
+#=
 using CairoMakie
 
 ρt = FieldTimeSeries("cabbeling.jld2", "ρ")
@@ -69,24 +71,5 @@ record(fig, "cabbeling.mp4", 1:Nt, framerate=24) do nn
     @info "Drawing frame $nn of $Nt..."
     n[] = nn
 end
-
-#=
-ρ = Field(seawater_density(model))
-compute!(ρ)
-#save("cabbeling.png", current_figure())
-ρmax = maximum(ρ)
-ρmin = minimum(ρ)
-ρmid = (ρmax + ρmin) / 2
-Δρ = ρmax - ρmin
-ρhi = ρmid + 0.4 * Δρ
-ρlo = ρmid - 0.4 * Δρ
-
-using CairoMakie
-fig = Figure(size=(600, 1200))
-axT = Axis(fig[1, 1])
-axρ = Axis(fig[1, 2])
-heatmap!(axT, model.tracers.T, colormap=:thermal)
-heatmap!(axρ, ρ, colormap=:grays, colorrange=(ρlo, ρhi))
-
-save("cabbeling.png", current_figure())
 =#
+

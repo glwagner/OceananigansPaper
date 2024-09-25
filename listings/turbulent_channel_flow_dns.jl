@@ -1,34 +1,59 @@
 using Oceananigans
+using Oceananigans.Fields: ConstantField
+using Oceananigans.TurbulenceClosures:  VerticallyImplicitTimeDiscretization
 
-Nx = 256
-Ny = 64
-Nz = 128
+using Printf
+
+Ny = 256
+Nx = 2Ny
+Nz = Ny
 
 ϵ = 1 # stretching parameter (↑↑ ⟹  more stretching)
 ζ(k) = 2/Nz * (k - 1) - 1 # ζ ∈ [-1, 1]
 z(k) = tanh(ϵ * ζ(k)) / tanh(ϵ)
 
-grid = RectilinearGrid(CPU(); topology = (Periodic, Periodic, Bounded),
+grid = RectilinearGrid(GPU(); topology = (Periodic, Periodic, Bounded),
                        size=(Nx, Ny, Nz), x = (0, 4π), y = (-π, π), z)
 
-Re = 180
-closure = ScalarDiffusivity(ν=1/Re)
+@show grid
 
-Px = 1 # mean x-direction pressure gradient
+vitd = VerticallyImplicitTimeDiscretization()
+Re = 180
+closure = ScalarDiffusivity(vitd; ν=1/Re)
+
+Px = ConstantField(1) # mean x-direction pressure gradient
 forcing = (; u=Px)
 
 no_slip = ValueBoundaryCondition(0)
 uv_bcs = FieldBoundaryConditions(top=no_slip, bottom=no_slip)
 boundary_conditions = (u=uv_bcs, v=uv_bcs)
 
-model = NonhydrostaticModel(; grid, closure, boundary_conditions, forcing)
+model = NonhydrostaticModel(; grid, closure, boundary_conditions, forcing, timestepper=:RungeKutta3)
 
-u₀(x, y, z) = 30 * (1 - z^2)
-v₀(x, y, z) = 1e-3 * randn()
-w₀(x, y, z) = 1e-3 * randn()
+u₀(x, y, z) = 10 * (1 - z^2) + randn()
+v₀(x, y, z) = randn()
+w₀(x, y, z) = randn()
 set!(model, u=u₀, v=v₀, w=w₀)
 
-simulation = Simulation(model, Δt=1e-4, stop_iteration=10)
+Δx = minimum_xspacing(grid)
+max_Δt = 0.2 * Δx^2 * Re
+simulation = Simulation(model, Δt=1e-4, stop_time=10)
+conjure_time_step_wizard!(simulation, cfl=0.5, IterationInterval(10); max_Δt)
+
+progress(sim) = @info @sprintf("Iter: %d, time: %.4f, Δt: %.2e, max|u|: (%.2e, %.2e, %.2e)",
+                               iteration(sim), time(sim), sim.Δt,
+                               maximum(abs, interior(sim.model.velocities.u)),
+                               maximum(abs, interior(sim.model.velocities.v)),
+                               maximum(abs, interior(sim.model.velocities.w)))
+
+add_callback!(simulation, progress, IterationInterval(100))
+
+simulation.output_writers[:jld2] = JLD2OutputWriter(model, model.velocities;
+                                                    filename = "turbulent_channel_dns.jld2",
+                                                    schedule = TimeInterval(10),
+                                                    with_halos = true,
+                                                    overwrite_existing = true)
+
 run!(simulation)
 
 #=
