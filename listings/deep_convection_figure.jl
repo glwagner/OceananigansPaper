@@ -2,8 +2,8 @@ using Oceananigans
 using GLMakie
 using Printf
 
-xzfilename = "deep_convection_xz.jld2"
-xyfilename = "deep_convection_xy.jld2"
+xzfilename = "deep_convection_no_stokes_xz.jld2"
+xyfilename = "deep_convection_no_stokes_xy.jld2"
 
 wxzt = FieldTimeSeries(xzfilename, "w")
 wxyt = FieldTimeSeries(xyfilename, "w")
