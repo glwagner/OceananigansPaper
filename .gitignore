@@ -26,6 +26,7 @@ Manifest.toml
 *.pdf
 *.png
 *.jld2
+*.nc
 *.mp4
 *.swp
 *.jpeg
