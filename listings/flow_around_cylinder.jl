@@ -1,8 +1,10 @@
 using Oceananigans
+using Oceananigans.Models.NonhydrostaticModels: ConjugateGradientPoissonSolver
 using Printf
 
 config = :les
-Re = 10^6
+Re = 1
+arch = CPU()
 # config = :les
 
 if config == :dns
@@ -37,11 +39,14 @@ end
 
 prefix = "flow_around_cylinder_$(config)_Re$(Re)_Ny$(Ny)"
 
-grid = RectilinearGrid(GPU(), size=(Nx, Ny), x=(-6, 42), y=(-12, 12), halo = (7, 7),
+grid = RectilinearGrid(arch, size=(Nx, Ny); x, y, halo=(7, 7),
                        topology=(Periodic, Bounded, Flat))
 
 cylinder(x, y) = (x^2 + y^2) ≤ 1
 grid = ImmersedBoundaryGrid(grid, GridFittedBoundary(cylinder))
+
+@inline u_drag(x, y, t, u, v, Cᴰ) = - Cᴰ * u * sqrt(u^2 + v^2)
+@inline v_drag(x, y, t, u, v, Cᴰ) = - Cᴰ * v * sqrt(u^2 + v^2)
 
 if config == :dns
     advection = Centered(order=2)
@@ -56,8 +61,8 @@ elseif config == :les
 
     x₁ = minimum_xspacing(grid) / 2
     ϰ = 0.4
-    ℓ = 1e-1
-    Cᴰ = (ϰ / log(x₁ / ℓ))^2
+    ℓ = 1e-4
+    @show Cᴰ = (ϰ / log(x₁ / ℓ))^2
     u_drag_bc = FluxBoundaryCondition(u_drag, field_dependencies=(:u, :v), parameters=Cᴰ)
     v_drag_bc = FluxBoundaryCondition(v_drag, field_dependencies=(:u, :v), parameters=Cᴰ)
     u_bcs = FieldBoundaryConditions(immersed=u_drag_bc)
@@ -66,37 +71,34 @@ elseif config == :les
 end
 
 rate = 2
-@inline mask(x, y, δ=6, x₀=42-δ) = max(zero(x), (x - x₀) / δ)
+x = xnodes(grid, Face())
+@show x₀ = x[end]
+@inline mask(x, y, δ=6, x₀=x₀) = max(zero(x), (x - x₀ + δ) / δ)
 u_sponge = Relaxation(target=1; mask, rate)
 v_sponge = Relaxation(target=0; mask, rate)
 forcing = (u=u_sponge, v=v_sponge)
+pressure_solver = nothing #ConjugateGradientPoissonSolver(grid, maxiter=20)
 
-model = NonhydrostaticModel(; grid, closure,
-                            advection, forcing, boundary_conditions, timestepper=:RungeKutta3)
+model = NonhydrostaticModel(; grid, pressure_solver, closure,
+                            advection, forcing, boundary_conditions,
+                            timestepper=:RungeKutta3)
+
 uᵢ(x, y) = 1 + 1e-2 * randn()
 set!(model, u=uᵢ)
 
 Δx = minimum_xspacing(grid)
-max_Δt = if config == :dns
-    0.2 * Δx^2 * Re
+if config == :dns
+    Δt = max_Δt = 0.2 * Δx^2 * Re
 else
-    0.2 * Δx
+    Δt = 0.2 * Δx
+    max_Δt = Inf
 end
 
-simulation = Simulation(model, Δt=max_Δt, stop_time=200)
-conjure_time_step_wizard!(simulation, cfl=0.5, IterationInterval(10); max_Δt)
-
-progress(sim) = @info @sprintf("Iter: %d, time: %.2f", iteration(sim), time(sim))
-add_callback!(simulation, progress, IterationInterval(100))
+simulation = Simulation(model, Δt=Δt, stop_time=10)
+conjure_time_step_wizard!(simulation, cfl=0.7, IterationInterval(3); max_Δt)
 
 u, v, w = model.velocities
-ζ = ∂x(v) - ∂y(u)
-outputs = (; u, v, ζ)
-simulation.output_writers[:jld2] = JLD2OutputWriter(model, outputs,
-                                                    schedule = TimeInterval(10),
-                                                    filename = prefix * "_fields.jld2",
-                                                    overwrite_existing = true,
-                                                    with_halos = true)
+d = ∂x(u) + ∂y(v)
 
 # Drag computation
 μ = XFaceField(grid)
@@ -105,7 +107,36 @@ r = u_sponge.rate
 drag_force = Field(Integral(r * μ * (1 - u)))
 compute!(drag_force)
 
-simulation.output_writers[:drag] = JLD2OutputWriter(model, (; drag),
+function progress(sim)
+    if pressure_solver isa ConjugateGradientPoissonSolver
+        pressure_iters = iteration(pressure_solver)
+    else
+        pressure_iters = 0
+    end
+
+    compute!(drag_force)
+    D = first(drag_force)
+    vmax = maximum(model.velocities.v)
+    dmax = maximum(abs, d)
+
+    @info @sprintf("Iter: %d, time: %.2f, Δt: %.4f, Poisson iters: %d, max d: %.2e, max v: %.2e, D = %0.2f",
+                   iteration(sim), time(sim), sim.Δt, pressure_iters, dmax, vmax, D)
+
+    return nothing
+end
+
+add_callback!(simulation, progress, IterationInterval(10))
+
+ζ = ∂x(v) - ∂y(u)
+outputs = (; u, v, ζ)
+
+simulation.output_writers[:jld2] = JLD2OutputWriter(model, outputs,
+                                                    schedule = TimeInterval(10),
+                                                    filename = prefix * "_fields.jld2",
+                                                    overwrite_existing = true,
+                                                    with_halos = true)
+
+simulation.output_writers[:drag] = JLD2OutputWriter(model, (; drag_force),
                                                     schedule = TimeInterval(0.1),
                                                     filename = prefix * "_drag.jld2",
                                                     overwrite_existing = true,
@@ -113,13 +144,13 @@ simulation.output_writers[:drag] = JLD2OutputWriter(model, (; drag),
  
 run!(simulation)
 
-#=
 using GLMakie
-u, v, w = model.velocities
-ζ = Field(∂x(v) - ∂y(u))
+ζ = Field(ζ)
 compute!(ζ)
 
-heatmap(ζ, nan_color=:gray)
-display(current_figure())
-=#
+fig = Figure(size=(1600, 500))
+ax = Axis(fig[1, 1], aspect=3)
+heatmap!(ax, ζ, colormap=:balance, nan_color=:gray)
+display(fig)
+
 

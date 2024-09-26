@@ -37,7 +37,7 @@ b_immersed_bc = FluxBoundaryCondition(5e-8)
 b_bcs = FieldBoundaryConditions(immersed=b_immersed_bc)
 boundary_conditions = (; b=b_bcs)
 
-pressure_solver = ImmersedPoissonSolver(grid, maxiter=20)
+pressure_solver = ImmersedPoissonSolver(grid)#, maxiter=3)
 #pressure_solver = ImmersedPoissonSolver(grid, preconditioner=DiagonallyDominantPreconditioner())
 #pressure_solver = ImmersedPoissonSolver(grid, preconditioner=nothing)
 
