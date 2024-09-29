@@ -1,23 +1,22 @@
 using Oceananigans
 using Oceananigans.Models.NonhydrostaticModels: ConjugateGradientPoissonSolver
 using Printf
+using CUDA
 
 config = :les
-Re = 1
-arch = CPU()
-# config = :les
+u∞ = 1
+r = 1/2
+arch = GPU()
+stop_time = 100
 
 if config == :dns
-    if Re == 1
+    if Re <= 10
         Ny = 256 
         Nx = 2Ny
-    elseif Re == 10
-        Ny = 256 
-        Nx = 2Ny
-    elseif Re == 100
+    elseif Re <= 100
         Ny = 512 
         Nx = 2Ny
-    elseif Re == 1000
+    elseif Re <= 1000
         Ny = 2^11
         Nx = 2Ny
     elseif Re == 10^4
@@ -30,19 +29,21 @@ if config == :dns
         Ny = 3/2 * 2^13 |> Int
         Nx = 2Ny
     end
-
 else
-    Ny = 2^11
+    Ny = 512
     Nx = 2Ny
     Re = Inf
 end
 
 prefix = "flow_around_cylinder_$(config)_Re$(Re)_Ny$(Ny)"
 
-grid = RectilinearGrid(arch, size=(Nx, Ny); x, y, halo=(7, 7),
+x = (-3, 21) # 24
+y = (-6, 6)  # 12
+
+grid = RectilinearGrid(arch, size=(Nx, Ny); x, y, halo=(9, 9),
                        topology=(Periodic, Bounded, Flat))
 
-cylinder(x, y) = (x^2 + y^2) ≤ 1
+cylinder(x, y) = (x^2 + y^2) ≤ r^2
 grid = ImmersedBoundaryGrid(grid, GridFittedBoundary(cylinder))
 
 @inline u_drag(x, y, t, u, v, Cᴰ) = - Cᴰ * u * sqrt(u^2 + v^2)
@@ -70,18 +71,25 @@ elseif config == :les
     boundary_conditions = (u=u_bcs, v=v_bcs)
 end
 
-rate = 2
+rate = 1
 x = xnodes(grid, Face())
-@show x₀ = x[end]
-@inline mask(x, y, δ=6, x₀=x₀) = max(zero(x), (x - x₀ + δ) / δ)
+@inline mask(x, y, δ=6, x₀=x[end]) = max(zero(x), 1 + (x - x₀) / δ)
 u_sponge = Relaxation(target=1; mask, rate)
 v_sponge = Relaxation(target=0; mask, rate)
 forcing = (u=u_sponge, v=v_sponge)
-pressure_solver = nothing #ConjugateGradientPoissonSolver(grid, maxiter=20)
+#pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=100, reltol=eps(grid))
+#pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=100)
+pressure_solver = nothing
+
+if isnothing(pressure_solver)
+    prefix *= "_fft"
+end
 
 model = NonhydrostaticModel(; grid, pressure_solver, closure,
                             advection, forcing, boundary_conditions,
                             timestepper=:RungeKutta3)
+
+@show model
 
 uᵢ(x, y) = 1 + 1e-2 * randn()
 set!(model, u=uᵢ)
@@ -94,7 +102,7 @@ else
     max_Δt = Inf
 end
 
-simulation = Simulation(model, Δt=Δt, stop_time=10)
+simulation = Simulation(model; Δt, stop_time)
 conjure_time_step_wizard!(simulation, cfl=0.7, IterationInterval(3); max_Δt)
 
 u, v, w = model.velocities
@@ -103,8 +111,8 @@ d = ∂x(u) + ∂y(v)
 # Drag computation
 μ = XFaceField(grid)
 set!(μ, mask)
-r = u_sponge.rate
-drag_force = Field(Integral(r * μ * (1 - u)))
+ω = u_sponge.rate
+drag_force = Field(Integral(ω * μ * (u∞ - u)))
 compute!(drag_force)
 
 function progress(sim)
@@ -115,20 +123,21 @@ function progress(sim)
     end
 
     compute!(drag_force)
-    D = first(drag_force)
+    D = CUDA.@allowscalar first(drag_force)
+    cᴰ = D / (u∞ * r) 
     vmax = maximum(model.velocities.v)
     dmax = maximum(abs, d)
 
-    @info @sprintf("Iter: %d, time: %.2f, Δt: %.4f, Poisson iters: %d, max d: %.2e, max v: %.2e, D = %0.2f",
-                   iteration(sim), time(sim), sim.Δt, pressure_iters, dmax, vmax, D)
+    @info @sprintf("Iter: %d, time: %.2f, Δt: %.4f, Poisson iters: %d, max d: %.2e, max v: %.2e, cᴰ = %0.2f",
+                   iteration(sim), time(sim), sim.Δt, pressure_iters, dmax, vmax, cᴰ)
 
     return nothing
 end
 
-add_callback!(simulation, progress, IterationInterval(10))
+add_callback!(simulation, progress, IterationInterval(1))
 
 ζ = ∂x(v) - ∂y(u)
-outputs = (; u, v, ζ)
+outputs = (; u, v, ζ, d)
 
 simulation.output_writers[:jld2] = JLD2OutputWriter(model, outputs,
                                                     schedule = TimeInterval(10),
@@ -144,6 +153,7 @@ simulation.output_writers[:drag] = JLD2OutputWriter(model, (; drag_force),
  
 run!(simulation)
 
+#=
 using GLMakie
 ζ = Field(ζ)
 compute!(ζ)
@@ -152,5 +162,5 @@ fig = Figure(size=(1600, 500))
 ax = Axis(fig[1, 1], aspect=3)
 heatmap!(ax, ζ, colormap=:balance, nan_color=:gray)
 display(fig)
-
+=#
 
