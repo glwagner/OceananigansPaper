@@ -1,8 +1,7 @@
-#=
 using Oceananigans
 using CairoMakie
 
-grid = RectilinearGrid(CPU(),
+grid = RectilinearGrid(CPU(), halo=(5, 5),
                        size=(256, 256), x=(-π, π), y=(-π, π),
                        topology = (Periodic, Periodic, Flat))
 
@@ -25,11 +24,15 @@ simulation = Simulation(model; Δt=0.01, stop_time=2.5)
 
 using Printf
 
+wall_time = Ref(time_ns())
+
 function print_progress(sim)
     u, v, w = sim.model.velocities
     max_u = max(maximum(abs, u), maximum(abs, v))
-    @info @sprintf("Iteration: %d, time: %.1f, max|u|: %.2e",
-                   iteration(sim), time(sim), max_u) 
+    elapsed = 1e-9 * (time_ns() - wall_time[])
+    @info @sprintf("Iteration: %d, time: %.1f, max|u|: %.2e, wall time: %s",
+                   iteration(sim), time(sim), max_u, prettytime(elapsed)) 
+    wall_time[] = time_ns()
     return nothing
 end
 
@@ -39,7 +42,6 @@ run!(simulation)
 c = deepcopy(model.tracers.c)
 simulation.stop_time = 10
 run!(simulation)
-=#
 
 # Visualize the resulting vorticity field.
 u, v, w = model.velocities

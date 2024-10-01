@@ -2,20 +2,18 @@ using Oceananigans
 using GLMakie
 
 fig = Figure(size=(1110, 570))
-ax1 = Axis(fig[1, 1], aspect=4, xlabel="x", ylabel="y", xaxisposition=:top)
-ax2 = Axis(fig[2, 1], aspect=4, xlabel="x", ylabel="y")
-ax3 = Axis(fig[3, 1], aspect=4, xlabel="x", ylabel="y")
-axF = Axis(fig[1:3, 2], xlabel="Time", ylabel="Drag coefficient")
+ax1 = Axis(fig[1, 1], aspect=2, xlabel="x", ylabel="y", xaxisposition=:top)
+ax2 = Axis(fig[2, 1], aspect=2, xlabel="x", ylabel="y")
+ax3 = Axis(fig[3, 1], aspect=2, xlabel="x", ylabel="y")
+#axF = Axis(fig[1:3, 2], xlabel="Time", ylabel="Drag coefficient")
 
 hidexdecorations!(ax2)
 
 n = Observable(1)
 
-#filename1 = "flow_around_cylinder_dns_Re10_Ny256_fields.jld2"
 filename1 = "flow_around_cylinder_dns_Re100_Ny512_fields.jld2"
-#filename2 = "flow_around_cylinder_dns_Re100_Ny512_fields.jld2"
 filename2 = "flow_around_cylinder_dns_Re1000_Ny2048_fields.jld2"
-filename3 = "flow_around_cylinder_les_ReInf_Ny512_fields.jld2"
+filename3 = "flow_around_cylinder_les_ReInf_Ny2048_fields.jld2"
 
 ut1 = FieldTimeSeries(filename1, "u")
 vt1 = FieldTimeSeries(filename1, "v")
@@ -68,6 +66,7 @@ labels = [
     "LES (Re → ∞)",
 ]
 
+#=
 filenames = [
     "flow_around_cylinder_dns_Re1_drag.jld2",
     "flow_around_cylinder_dns_Re10_Ny256_drag.jld2",
@@ -77,18 +76,19 @@ filenames = [
 ]
 
 for (label, filename) in zip(labels, filenames)
-    F = FieldTimeSeries(filename, "drag") 
+    F = FieldTimeSeries(filename, "drag_force") 
     lines!(axF, F.times, F[1, 1, 1, :]; label)
 end
 
 Legend(fig[1:3, 3], axF)
+=#
 
 ylims!(ax1, -6, 6)
 ylims!(ax2, -6, 6)
 ylims!(ax3, -6, 6)
 
 #rowsize!(fig.layout, 2, Relative(0.2))
-colsize!(fig.layout, 2, Relative(0.2))
+#colsize!(fig.layout, 2, Relative(0.2))
 
 text!(ax1, 0.01, 0.95, align=(:left, :top), space=:relative, text="DNS (Re = 100)")
 text!(ax2, 0.01, 0.95, align=(:left, :top), space=:relative, text="DNS (Re = 1000)")
@@ -103,6 +103,6 @@ text!(ax3, 0.01, 0.95, align=(:left, :top), space=:relative, text="LES (Re → �
 #     n[] = nn
 # end
 
-n[] = length(ut1)
+n[] = 11 #length(ut1)
 display(fig)
 
