@@ -1,7 +1,14 @@
 [deps]
+BFloat16s = "ab4f0b2a-ad5b-11e8-123f-65d77653426b"
 CFTime = "179af706-886a-5703-950a-314cd64e0468"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+ClimaOcean = "0376089a-ecfe-4b0e-a64f-9c555d74d754"
+ClimaSeaIce = "6ba0ff68-24e6-4315-936c-2e99227c95a4"
 Oceananigans = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
 OrthogonalSphericalShellGrids = "c2be9673-fb75-4747-82dc-aa2bb9f4aed0"
 Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 SeawaterPolynomials = "d496a93d-167e-4197-9f49-d3af4ff8fe40"
+
+[extras]
+CUDA_Runtime_jll = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
