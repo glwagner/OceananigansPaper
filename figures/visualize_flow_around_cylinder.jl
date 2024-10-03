@@ -2,9 +2,9 @@ using Oceananigans
 using GLMakie
 
 fig = Figure(size=(1110, 570))
-ax1 = Axis(fig[1, 1], aspect=2, xlabel="x", ylabel="y", xaxisposition=:top)
-ax2 = Axis(fig[2, 1], aspect=2, xlabel="x", ylabel="y")
-ax3 = Axis(fig[3, 1], aspect=2, xlabel="x", ylabel="y")
+ax1 = Axis(fig[1, 1], aspect=3, xlabel="x", ylabel="y", xaxisposition=:top)
+ax2 = Axis(fig[2, 1], aspect=3, xlabel="x", ylabel="y")
+ax3 = Axis(fig[3, 1], aspect=3, xlabel="x", ylabel="y")
 #axF = Axis(fig[1:3, 2], xlabel="Time", ylabel="Drag coefficient")
 
 hidexdecorations!(ax2)
@@ -83,14 +83,18 @@ end
 Legend(fig[1:3, 3], axF)
 =#
 
-ylims!(ax1, -6, 6)
-ylims!(ax2, -6, 6)
-ylims!(ax3, -6, 6)
+ylims!(ax1, -4, 4)
+ylims!(ax2, -4, 4)
+ylims!(ax3, -4, 4)
+
+xlims!(ax1, -3, 21)
+xlims!(ax2, -3, 21)
+xlims!(ax3, -3, 21)
 
 #rowsize!(fig.layout, 2, Relative(0.2))
 #colsize!(fig.layout, 2, Relative(0.2))
 
-text!(ax1, 0.01, 0.95, align=(:left, :top), space=:relative, text="DNS (Re = 100)")
+text!(ax1, 0.01, 0.95, align=(:left, :top), space=:relative, text="DNS (Re = 50)")
 text!(ax2, 0.01, 0.95, align=(:left, :top), space=:relative, text="DNS (Re = 1000)")
 text!(ax3, 0.01, 0.95, align=(:left, :top), space=:relative, text="LES (Re → ∞)")
 
@@ -103,6 +107,6 @@ text!(ax3, 0.01, 0.95, align=(:left, :top), space=:relative, text="LES (Re → �
 #     n[] = nn
 # end
 
-n[] = 11 #length(ut1)
+n[] = 101 #length(ut1)
 display(fig)
 

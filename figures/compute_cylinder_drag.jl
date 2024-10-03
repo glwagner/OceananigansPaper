@@ -1,19 +1,23 @@
 using Oceananigans
 using GLMakie
 
+cases = [
+    "Re1_Ny512",
+    "Re2_Ny512",
+    "Re5_Ny512",
+    "Re10_Ny512",
+    "Re20_Ny512",
+    "Re50_Ny512",
+    "Re100_Ny512",
+    "Re200_Ny2048",
+    "Re500_Ny2048",
+    "Re1000_Ny2048",
+    "ReInf_Ny2048",
+]
+
 fig = Figure(size=(1110, 570))
 ax1 = Axis(fig[1, 1], aspect=2, xlabel="x", ylabel="y", xaxisposition=:top)
 ax2 = Axis(fig[2, 1], aspect=2, xlabel="x", ylabel="y")
-ax3 = Axis(fig[3, 1], aspect=2, xlabel="x", ylabel="y")
-#axF = Axis(fig[1:3, 2], xlabel="Time", ylabel="Drag coefficient")
-
-hidexdecorations!(ax2)
-
-n = Observable(1)
-
-filename1 = "flow_around_cylinder_dns_Re100_Ny512_fields.jld2"
-filename2 = "flow_around_cylinder_dns_Re1000_Ny2048_fields.jld2"
-filename3 = "flow_around_cylinder_les_ReInf_Ny2048_fields.jld2"
 
 ut1 = FieldTimeSeries(filename1, "u")
 vt1 = FieldTimeSeries(filename1, "v")
