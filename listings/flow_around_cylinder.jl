@@ -18,7 +18,7 @@ r = 1/2
 arch = GPU()
 stop_time = 100
 
-for Re in [Inf]
+for Re in [100]
     if config == :dns
         if Re <= 100
             Ny = 512 
