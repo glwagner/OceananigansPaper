@@ -62,7 +62,7 @@ Nx = 2Ny
 
 cylinder(x, y) = (x^2 + y^2) ≤ r^2
 FILE_DIR = "./Output"
-prefix = "flow_around_cylinder_$(config)_Re$(Re)_Ny$(Ny)"
+prefix = "flow_around_cylinder_$(config)_Re$(Re)_Ny$(Ny)_cfl0.75_sponge6"
 
 ϵ = 0 # break up-down symmetry
 x = (-6, 30) # 36
@@ -98,7 +98,7 @@ end
 
 rate = 4
 x = xnodes(grid, Face())
-@inline mask(x, y, δ=3, x₀=27) = max(zero(x), (x - x₀) / δ)
+@inline mask(x, y, δ=6, x₀=24) = max(zero(x), (x - x₀) / δ)
 u_sponge = Relaxation(target=1; mask, rate)
 v_sponge = Relaxation(target=0; mask, rate)
 forcing = (u=u_sponge, v=v_sponge)
@@ -135,7 +135,7 @@ else
 end
 
 simulation = Simulation(model; Δt, stop_time)
-conjure_time_step_wizard!(simulation, cfl=1.0, IterationInterval(3); max_Δt)
+conjure_time_step_wizard!(simulation, cfl=0.75, IterationInterval(3); max_Δt)
 
 u, v, w = model.velocities
 d = ∂x(u) + ∂y(v)
