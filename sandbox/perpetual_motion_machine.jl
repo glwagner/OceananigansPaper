@@ -9,25 +9,27 @@ grid = RectilinearGrid(topology = (Periodic, Flat, Bounded),
 
 #equation_of_state = TEOS10.TEOS10EquationOfState()
 equation_of_state = LinearEquationOfState(thermal_expansion=2e-4, haline_contraction=8e-5)
-buoyancy = SeawaterBuoyancy(; equation_of_state)
-#hydrostatic_pressure_anomaly = nothing
-hydrostatic_pressure_anomaly = CenterField(grid)
+#buoyancy = SeawaterBuoyancy(; equation_of_state)
+#tracers = (:T, :S)
+buoyancy = BuoyancyTracer() #SeawaterBuoyancy(; equation_of_state)
+tracers = :b
+hydrostatic_pressure_anomaly = nothing
+#hydrostatic_pressure_anomaly = CenterField(grid)
 
-model = NonhydrostaticModel(; grid, buoyancy,
+model = NonhydrostaticModel(; grid, buoyancy, tracers,
                             advection = UpwindBiased(order=1),
                             hydrostatic_pressure_anomaly,
-                            #timestepper = :RungeKutta3,
-                            timestepper = :QuasiAdamsBashforth2,
-                            tracers = (:T, :S))
+                            timestepper = :QuasiAdamsBashforth2)
 
 ξᵢ(x, z) = 1e-9 * randn()
-set!(model, T=20, S=35, u=ξᵢ, w=ξᵢ)
+#set!(model, T=20, S=35, u=ξᵢ, w=ξᵢ)
+set!(model, b=1, u=ξᵢ, w=ξᵢ)
 
 u, v, w = model.velocities
 b = BuoyancyModels.BuoyancyField(model)
 e = @at (Center, Center, Center) (u^2 + v^2 + w^2) / 2
 
-simulation = Simulation(model, Δt=100, stop_iteration=4000)
+simulation = Simulation(model, Δt=10, stop_iteration=1000)
 
 B = Field(Average(b))
 b′² = Field((b - B)^2)
@@ -44,9 +46,8 @@ end
 
 add_callback!(simulation, progress, IterationInterval(10))
 
-
 outputs = merge(model.velocities, model.tracers, (; b, b′², e))
-filename = "stable_motion_machine.jld2"
+filename = "test_buoyancy_tracer.jld2"
 
 simulation.output_writers[:jld2] = JLD2OutputWriter(model, outputs; filename,
                                                     schedule = IterationInterval(10),
