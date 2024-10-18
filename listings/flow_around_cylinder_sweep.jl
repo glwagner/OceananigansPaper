@@ -6,6 +6,7 @@ using Oceananigans.Solvers: FFTBasedPoissonSolver
 using Printf
 using CUDA
 using ArgParse
+using CairoMakie
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -62,7 +63,7 @@ Nx = 2Ny
 
 cylinder(x, y) = (x^2 + y^2) ≤ r^2
 FILE_DIR = "./Output"
-prefix = "flow_around_cylinder_$(config)_Re$(Re)_Ny$(Ny)_cfl0.75_sponge6"
+prefix = "flow_around_cylinder_$(config)_Re$(Re)_Ny$(Ny)_cfl0.75"
 
 ϵ = 0 # break up-down symmetry
 x = (-6, 30) # 36
@@ -98,7 +99,7 @@ end
 
 rate = 4
 x = xnodes(grid, Face())
-@inline mask(x, y, δ=6, x₀=24) = max(zero(x), (x - x₀) / δ)
+@inline mask(x, y, δ=3, x₀=27) = max(zero(x), (x - x₀) / δ)
 u_sponge = Relaxation(target=1; mask, rate)
 v_sponge = Relaxation(target=0; mask, rate)
 forcing = (u=u_sponge, v=v_sponge)
@@ -109,9 +110,9 @@ reltol = abstol = 1e-7
 pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=100;
                                                     reltol, abstol, preconditioner)
 
-#pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=100)
-#pressure_solver = ConjugateGradientPoissonSolver(grid; preconditioner=ddp)
-#pressure_solver = nothing
+# pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=100)
+# pressure_solver = ConjugateGradientPoissonSolver(grid; preconditioner=ddp)
+# pressure_solver = nothing
 
 if isnothing(pressure_solver)
     prefix *= "_fft"
@@ -199,3 +200,21 @@ simulation.output_writers[:drag] = JLD2OutputWriter(model, (; drag_force),
     
 run!(simulation)
 
+ζ_data = FieldTimeSeries("$(OUTPUT_DIR)/fields.jld2", "ζ", backend=OnDisk())
+
+xF = xnodes(ζ_data.grid, Face(), Face(), Center())
+yF = ynodes(ζ_data.grid, Face(), Face(), Center())
+Nt = length(ζ_data.times)
+#%%
+ζlim = (-maximum(abs.(ζ_data[Nt]))/10, maximum(abs.(ζ_data[Nt]))/10)
+fig = Figure()
+n = Observable(1)
+ζₙ = @lift interior(ζ_data[$n], :, :, 1)
+
+ax = Axis(fig[1, 1], xlabel = "x", ylabel = "y", aspect=DataAspect())
+heatmap!(ax, xF, yF, ζₙ, colormap = :balance, colorrange = ζlim)
+
+record(fig, "$(OUTPUT_DIR)/zeta_field.mp4", 1:Nt, framerate=10, px_per_unit=2) do nn
+    @info "Recording frame $nn"
+    n[] = nn
+end
