@@ -214,7 +214,7 @@ n = Observable(1)
 ax = Axis(fig[1, 1], xlabel = "x", ylabel = "y", aspect=DataAspect())
 heatmap!(ax, xF, yF, ζₙ, colormap = :balance, colorrange = ζlim)
 
-record(fig, "$(OUTPUT_DIR)/zeta_field.mp4", 1:Nt, framerate=10, px_per_unit=2) do nn
+CairoMakie.record(fig, "$(OUTPUT_DIR)/zeta_field.mp4", 1:Nt, framerate=10, px_per_unit=2) do nn
     @info "Recording frame $nn"
     n[] = nn
 end
