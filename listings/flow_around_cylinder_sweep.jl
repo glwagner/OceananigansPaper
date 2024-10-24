@@ -20,6 +20,10 @@ function parse_commandline()
             help = "Number of grid points in the y direction"
             arg_type = Int
             default = 2048
+        "--solver"
+            help = "Solver to use"
+            arg_type = String
+            default = "cg"
     end
     return parse_args(s)
 end
@@ -36,10 +40,11 @@ config = :dns
 u∞ = 1
 r = 1/2
 arch = GPU()
-stop_time = 100
+stop_time = 200
 Re = args["Re"]
 Ny = args["Ny"]
 Nx = 2Ny
+solver = args["solver"]
 
 # if config == :dns
 #     if Re <= 1000
@@ -63,7 +68,7 @@ Nx = 2Ny
 
 cylinder(x, y) = (x^2 + y^2) ≤ r^2
 FILE_DIR = "./Output"
-prefix = "flow_around_cylinder_$(config)_Re$(Re)_Ny$(Ny)_cfl0.75"
+prefix = "flow_around_cylinder_$(solver)_$(config)_Re$(Re)_Ny$(Ny)"
 
 ϵ = 0 # break up-down symmetry
 x = (-6, 30) # 36
@@ -107,8 +112,13 @@ forcing = (u=u_sponge, v=v_sponge)
 ddp = DiagonallyDominantPreconditioner()
 preconditioner = FFTBasedPoissonSolver(reduced_precision_grid)
 reltol = abstol = 1e-7
-pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=100;
+
+if solver == "cg"
+    pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=100;
                                                     reltol, abstol, preconditioner)
+else
+    pressure_solver = nothing
+end
 
 # pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=100)
 # pressure_solver = ConjugateGradientPoissonSolver(grid; preconditioner=ddp)
@@ -123,13 +133,13 @@ model = NonhydrostaticModel(; grid, pressure_solver, closure,
 
 @show model
 
-uᵢ(x, y) = 1e-1 * randn()
-vᵢ(x, y) = 1e-1 * randn()
+uᵢ(x, y) = 1 + 1e-8 * randn()
+vᵢ(x, y) = 1e-8 * randn()
 set!(model, u=uᵢ, v=vᵢ)
 
 Δx = minimum_xspacing(grid)
 if config == :dns
-    Δt = max_Δt = 0.2 * Δx^2 * Re
+    Δt = max_Δt = 0.05 * Δx^2 * Re
 else
     Δt = 0.2 * Δx
     max_Δt = Inf
@@ -214,7 +224,7 @@ n = Observable(1)
 ax = Axis(fig[1, 1], xlabel = "x", ylabel = "y", aspect=DataAspect())
 heatmap!(ax, xF, yF, ζₙ, colormap = :balance, colorrange = ζlim)
 
-CairoMakie.record(fig, "$(OUTPUT_DIR)/zeta_field.mp4", 1:Nt, framerate=10, px_per_unit=2) do nn
+CairoMakie.record(fig, "$(OUTPUT_DIR)/$(prefix)_zeta_field.mp4", 1:Nt, framerate=10, px_per_unit=2) do nn
     @info "Recording frame $nn"
     n[] = nn
 end
