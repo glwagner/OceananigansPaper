@@ -1,55 +1,51 @@
 using Oceananigans
+using Oceananigans: WallTimeInterval
 using Oceananigans.Units
 using Oceananigans.TurbulenceClosures: CATKEVerticalDiffusivity
 using Printf
 using ClimaOcean: exponential_z_faces
 
 arch = GPU()
-Nx = 16 * 22
-Ny = 16 * 20
-Nz = 40
-Lz = 2000
+Nx = 12 * 22
+Ny = 12 * 20
+Nz = 100
+Lz = 4000
 z_faces = exponential_z_faces(; Nz, depth=Lz)
-stop_time = 360days * 100
+stop_time = 360days * 4
 
 grid = LatitudeLongitudeGrid(arch,
                              size = (Nx, Ny, Nz),
                              halo = (7, 7, 7),
-                             longitude = (0, 22),
+                             longitude = (-11, 11),
                              latitude = (30, 50),
                              z = z_faces)
 
 @show grid
 
-δλ = 10
-δφ = 20
-paraboloid(λ, φ) = (λ - 11)^2 / δλ^2 + (φ - 30)^2 / δφ^2
-
-H∞ = 3000
+δλ, δφ, H∞ = 10, 20, 6000
+paraboloid(λ, φ) = λ^2 / δλ^2 + (φ - 30)^2 / δφ^2
 bottom_height(λ, φ) = - H∞ * (1.1 - paraboloid(λ, φ))
-grid = ImmersedBoundaryGrid(grid, GridFittedBottom(bottom_height))
+grid = ImmersedBoundaryGrid(grid, PartialCellBottom(bottom_height))
 
 @inline τx(λ, φ, t, τ₀) = -τ₀ * (1 - cos(2π * (φ - 30) / 20))
 u_top_bc = FluxBoundaryCondition(τx, parameters=2e-4)
 u_bcs = FieldBoundaryConditions(top=u_top_bc)
 
-Lx = 2e6 # approx
-M² = 1e-7
 @inline b★(φ, p) = - p.Δb * sin(π/2 * (φ - 30) / 20)
-@inline b_restoring(λ, φ, t, b, p) = p.ω * (b★(φ, p) - b)
-b_top_bc = FluxBoundaryCondition(b_restoring, field_dependencies=:b, parameters=(ω=1/7days, Δb=M²*Lz))
+@inline b_restoring(λ, φ, t, b, p) = p.ω * (b - b★(φ, p))
+b_top_bc = FluxBoundaryCondition(b_restoring, field_dependencies=:b, parameters=(ω=1/1days, Δb=0.2))
 b_bcs = FieldBoundaryConditions(top=b_top_bc)
 
 model = HydrostaticFreeSurfaceModel(; grid,
                                     coriolis = HydrostaticSphericalCoriolis(),
-                                    momentum_advection = WENOVectorInvariant(vorticity_order=5),
+                                    momentum_advection = WENOVectorInvariant(),
                                     tracer_advection = WENO(order=9),
                                     closure = CATKEVerticalDiffusivity(),
                                     tracers = (:b, :e),
                                     buoyancy = BuoyancyTracer(),
                                     boundary_conditions = (u=u_bcs, b=b_bcs))
 
-N² = 1e-5
+N² = 2e-5
 bᵢ(x, y, z) = N² * z
 set!(model, b=bᵢ)
 
@@ -83,12 +79,20 @@ prefix = "double_gyre_Nx$(Nx)_Nz$(Nz)"
 for (name, indices) in zip(names, indiceses)
     output_writer = JLD2OutputWriter(model, outputs; indices,
                                      filename = string(prefix, "_", name),
-                                     schedule = TimeInterval(10day),
+                                     schedule = TimeInterval(2day),
                                      with_halos = true,
                                      overwrite_existing = true)
                                           
     simulation.output_writers[name] = output_writer
 end
+
+checkpointer = Checkpointer(model,
+                            prefix = "double_gyre",
+                            schedule = WallTimeInterval(3hours),
+                            cleanup = true,
+                            overwrite_existing = true)
+
+simulation.output_writers[:chk] = checkpointer
 
 run!(simulation)
 
