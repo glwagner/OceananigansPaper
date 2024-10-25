@@ -146,7 +146,7 @@ else
 end
 
 simulation = Simulation(model; Δt, stop_time)
-conjure_time_step_wizard!(simulation, cfl=0.75, IterationInterval(3); max_Δt)
+conjure_time_step_wizard!(simulation, cfl=0.6, IterationInterval(3); max_Δt)
 
 u, v, w = model.velocities
 d = ∂x(u) + ∂y(v)
