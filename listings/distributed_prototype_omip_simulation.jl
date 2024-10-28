@@ -1,5 +1,6 @@
 using Oceananigans
 using Oceananigans.Units
+using Oceananigans.DistributedComputations: Equal
 
 using ClimaOcean
 using ClimaOcean.ECCO: ECCO_restoring_forcing, ECCO4Monthly, ECCO2Daily, ECCOMetadata
@@ -10,32 +11,51 @@ using Printf
 using CFTime
 using Dates
 
-resolution = 1/8 # degree
+using MPI
+MPI.Init()
+
+resolution = 1/6 # degree
 Nx = round(Int, 360 / resolution)
 Ny = round(Int, 170 / resolution)
-Nz = 60
-Δt = 5minutes
+Nz = 100
+Δt = 2minutes
 stop_time = 180days
 z_faces = exponential_z_faces(; Nz, depth=6000)
-#arch = GPU()
-#prefix = "prototype_omip_simulation"
+partition = Partition(y=Equal())
 
-partition = Partition(y=2)
+@show partition
+
 arch = Distributed(GPU(); partition)
-@show prefix = string("prototype_omip_simulation_", arch.local_rank)
+rank = arch.local_rank
+prefix = "distributed_prototype_omip_simulation_rank$rank"
 
+@show arch
+
+#=
 grid = TripolarGrid(arch; 
                     size = (Nx, Ny, Nz), 
                     halo = (7, 7, 7), 
                     z = z_faces, 
                     north_poles_latitude = 55,
                     first_pole_longitude = 75)
+=#
 
-bottom_height = retrieve_bathymetry(grid;
+grid = LatitudeLongitudeGrid(arch; 
+                             size = (Nx, Ny, Nz), 
+                             halo = (7, 7, 7), 
+                             z = z_faces, 
+                             latitude = (-75, 75),
+                             longitude = (0, 360))
+
+@show grid
+
+bottom_height = retrieve_bathymetry(grid, "bathymetry.jld2";
                                     minimum_depth = 10,
                                     interpolation_passes = 2,
                                     major_basins = 1)
- 
+
+@show bottom_height
+
 grid = ImmersedBoundaryGrid(grid, GridFittedBottom(bottom_height); active_cells_map=true) 
 free_surface = SplitExplicitFreeSurface(grid; cfl=0.7, fixed_Δt=Δt)
 
@@ -68,10 +88,8 @@ FS = ECCO_restoring_forcing(salinity;    mask=restoring_mask_field, grid, archit
 forcing = (; T=FT, S=FS, u=Fu, v=Fv)
 
 # New advection scheme
-tracer_advection = WENO(order=7)
-momentum_advection = WENOVectorInvariant(vorticity_scheme=WENO(order=7),
-                                         divergence_scheme=WENO(order=5),
-                                         vertical_scheme=Centered(order=2))
+tracer_advection = WENO(order=9)
+momentum_advection = WENOVectorInvariant(vorticity_order=9)
 
 ocean = ocean_simulation(grid; forcing, tracer_advection, free_surface, momentum_advection) 
 
@@ -81,11 +99,14 @@ radiation = Radiation(arch, ocean_albedo=LatitudeDependentAlbedo())
 sea_ice = ClimaOcean.OceanSeaIceModels.MinimumTemperatureSeaIce()
 coupled_model = OceanSeaIceModel(ocean, sea_ice; atmosphere, radiation)
 
-@info "Set up coupled model:"
-@info coupled_model
+if rank == 0
+    @info "Set up coupled model:"
+    @info coupled_model
+end
 
-coupled_simulation = Simulation(coupled_model; Δt, stop_time=10days)
+coupled_simulation = Simulation(coupled_model; Δt, stop_time)
 
+#=
 fluxes = (u = ocean.model.velocities.u.boundary_conditions.top.condition,
           v = ocean.model.velocities.v.boundary_conditions.top.condition,
           T = ocean.model.tracers.T.boundary_conditions.top.condition,
@@ -97,6 +118,7 @@ ocean.output_writers[:fluxes] = JLD2OutputWriter(ocean.model, fluxes,
                                                  overwrite_existing = true,
                                                  array_type = Array{Float32},
                                                  filename = prefix * "surface_fluxes")
+=#
 
 κc = ocean.model.diffusivity_fields.κc
 outputs = merge(ocean.model.tracers, ocean.model.velocities, (; κc))
@@ -109,6 +131,7 @@ ocean.output_writers[:surface] = JLD2OutputWriter(ocean.model, outputs,
                                                   filename = prefix * "_surface",
                                                   indices = (:, :, grid.Nz))
 
+#=
 ocean.output_writers[:snapshots] = JLD2OutputWriter(ocean.model, merge(ocean.model.tracers, ocean.model.velocities),
                                                     schedule = TimeInterval(10days),
                                                     with_halos = true,
@@ -120,11 +143,14 @@ ocean.output_writers[:checkpoint] = Checkpointer(ocean.model,
                                                  schedule = TimeInterval(60days),
                                                  overwrite_existing = true,
                                                  prefix = prefix * "checkpoint")
+=#
 
-@info "Built an ocean simulation with the model:"
-@info ocean.model
-@info "\ninside the simulation:"
-@info ocean
+if rank == 0
+    @info "Built an ocean simulation with the model:"
+    @info ocean.model
+    @info "\ninside the simulation:"
+    @info ocean
+end
 
 #####
 ##### The atmosphere
@@ -147,19 +173,22 @@ function progress(sim)
     umax = maximum(abs, interior(u)), maximum(abs, interior(v)), maximum(abs, interior(w))
     step_time = 1e-9 * (time_ns() - wall_time[])
 
-    msg = @sprintf("Time: %s, step: %d", prettytime(sim), iteration(sim))
+    msg = @sprintf("Rank: %d, t: %s, step: %d", rank, prettytime(sim), iteration(sim))
 
     msg *= @sprintf(", max(u): (%.2e, %.2e, %.2e) m s⁻¹, extrema(T): %.2fᵒC, %.2fᵒC, wall time: %s",
                    umax..., Tmax, Tmin, prettytime(step_time))
 
     @info msg
+
     wall_time[] = time_ns()
 end
 
 add_callback!(coupled_simulation, progress, IterationInterval(10))
 
-@info "Running the coupled simulation:"
-@info coupled_simulation
+if rank == 0
+    @info "Running the coupled simulation:"
+    @info coupled_simulation
+end
     
 run!(coupled_simulation)
 
@@ -167,9 +196,8 @@ run!(coupled_simulation)
 #coupled_simulation.Δt = 5minutes
 #
 ## Let's reset the maximum number of iterations
-#coupled_simulation.stop_time = stop_time
+#coupled_simulation.stop_time = 7200days
 #coupled_simulation.stop_iteration = Inf
 #
 #run!(coupled_simulation)
 
-=#
