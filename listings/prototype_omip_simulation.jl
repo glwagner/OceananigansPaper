@@ -17,10 +17,7 @@ Nz = 60
 Δt = 5minutes
 stop_time = 180days
 z_faces = exponential_z_faces(; Nz, depth=6000)
-#arch = GPU()
-#prefix = "prototype_omip_simulation"
-
-partition = Partition(y=2)
+partition = Partition(y=4)
 arch = Distributed(GPU(); partition)
 @show prefix = string("prototype_omip_simulation_", arch.local_rank)
 
@@ -35,7 +32,7 @@ bottom_height = retrieve_bathymetry(grid;
                                     minimum_depth = 10,
                                     interpolation_passes = 2,
                                     major_basins = 1)
- 
+#= 
 grid = ImmersedBoundaryGrid(grid, GridFittedBottom(bottom_height); active_cells_map=true) 
 free_surface = SplitExplicitFreeSurface(grid; cfl=0.7, fixed_Δt=Δt)
 
