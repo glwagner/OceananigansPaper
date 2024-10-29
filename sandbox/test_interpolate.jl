@@ -6,7 +6,7 @@ using Oceananigans
 using Oceananigans.BoundaryConditions: fill_halo_regions!
 using Oceananigans.Fields: interpolate!
 
-partition = Partition(y=2)
+partition = Partition(y=Equal())
 arch = Distributed(GPU(); partition)
 x = y = z = (0, 1)
 grid = RectilinearGrid(arch; size=(16, 16, 16), x, y, z, topology=(Periodic, Periodic, Bounded))
