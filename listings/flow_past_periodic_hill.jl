@@ -52,7 +52,7 @@ end
 args = parse_commandline()
 
 arch = GPU()
-stop_time = 100
+stop_time = 500
 Re = args["Re"]
 solver = args["solver"]
 α = args["alpha"]
@@ -234,11 +234,14 @@ OUTPUT_DIR = "$(FILE_DIR)/$(prefix)"
 mkpath(OUTPUT_DIR)
 @info "Output directory: $OUTPUT_DIR"
 
+ζ = ∂z(u) - ∂x(w)
+
 ubar = Average(u, dims=2)
 vbar = Average(v, dims=2)
 wbar = Average(w, dims=2)
+ζbar = Average(ζ, dims=2)
 
-outputs = (; ubar, vbar, wbar)
+outputs = (; ubar, vbar, wbar, ζbar)
 
 simulation.output_writers[:jld2] = JLD2OutputWriter(model, outputs,
                                                     schedule = TimeInterval(1),
@@ -260,4 +263,81 @@ run!(simulation)
 # # hm = heatmap!(ax, xC, zC, interior(grid.immersed_boundary.mask, :, 1, :))
 # Colorbar(fig[1, 2], hm, tellheight=false)
 # display(fig)
-# #%%
+#%%
+ubar_data = FieldTimeSeries("$(OUTPUT_DIR)/fields.jld2", "ubar")
+vbar_data = FieldTimeSeries("$(OUTPUT_DIR)/fields.jld2", "vbar")
+wbar_data = FieldTimeSeries("$(OUTPUT_DIR)/fields.jld2", "wbar")
+
+xF = xnodes(ubar_data.grid, Face())
+xC = xnodes(ubar_data.grid, Center())
+yC = ynodes(ubar_data.grid, Center())
+yF = ynodes(ubar_data.grid, Face())
+zC = znodes(ubar_data.grid, Center())
+zF = znodes(ubar_data.grid, Face())
+Nt = length(ubar_data.times)
+
+ulim = (-maximum(abs, ubar_data), maximum(abs, ubar_data))
+vlim = (-maximum(abs, vbar_data), maximum(abs, vbar_data))
+wlim = (-maximum(abs, wbar_data), maximum(abs, wbar_data))
+#%%
+
+fig = Figure(size=(800, 1200))
+n = Observable(1)
+axu = Axis(fig[1, 1], xlabel = "x", ylabel = "z", aspect=DataAspect(), title = "u")
+axv = Axis(fig[2, 1], xlabel = "x", ylabel = "z", aspect=DataAspect(), title = "v")
+axw = Axis(fig[3, 1], xlabel = "x", ylabel = "z", aspect=DataAspect(), title = "w")
+
+uₙ = @lift interior(ubar_data[$n], :, 1, :)
+vₙ = @lift interior(vbar_data[$n], :, 1, :)
+wₙ = @lift interior(wbar_data[$n], :, 1, :)
+
+hmu = heatmap!(axu, xF, zC, uₙ, colormap = :balance, colorrange = ulim)
+hmv = heatmap!(axv, xC, zC, vₙ, colormap = :balance, colorrange = vlim)
+hmw = heatmap!(axw, xC, zF, wₙ, colormap = :balance, colorrange = wlim)
+
+Colorbar(fig[1, 2], hmu)
+Colorbar(fig[2, 2], hmv)
+Colorbar(fig[3, 2], hmw)
+
+title = @lift "Re = $(Re), t = $(ubar_data.times[$n])"
+Label(fig[0, :], title, font=:bold, tellwidth=false)
+trim!(fig.layout)
+
+# save("./$(OUTPUT_DIR)/$(prefix)_velocities.png", fig, px_per_unit = 4)
+CairoMakie.record(fig, "./$(OUTPUT_DIR)/$(prefix)_velocities.mp4", 1:Nt, framerate=10, px_per_unit=2) do nn
+    @info "Recording frame $nn"
+    n[] = nn
+end
+#%%
+ζbar_data = FieldTimeSeries("$(OUTPUT_DIR)/fields.jld2", "ζbar")
+
+xF = xnodes(ζbar_data.grid, Face())
+xC = xnodes(ζbar_data.grid, Center())
+yC = ynodes(ζbar_data.grid, Center())
+yF = ynodes(ζbar_data.grid, Face())
+zC = znodes(ζbar_data.grid, Center())
+zF = znodes(ζbar_data.grid, Face())
+Nt = length(ζbar_data.times)
+
+ζlim = (-maximum(abs, ζbar_data), maximum(abs, ζbar_data))
+#%%
+fig = Figure(size=(800, 500))
+n = Observable(1)
+axζ = Axis(fig[1, 1], xlabel = "x", ylabel = "z", aspect=DataAspect(), title = "ζ")
+
+ζₙ = @lift interior(ζbar_data[$n], :, 1, :)
+
+hmζ = heatmap!(axζ, xF, zF, ζₙ, colormap = :balance, colorrange = ζlim)
+
+Colorbar(fig[1, 2], hmζ)
+
+title = @lift "Re = $(Re), t = $(ubar_data.times[$n])"
+Label(fig[0, :], title, font=:bold, tellwidth=false)
+trim!(fig.layout)
+
+# save("./$(OUTPUT_DIR)/$(prefix)_velocities.png", fig, px_per_unit = 4)
+CairoMakie.record(fig, "./$(OUTPUT_DIR)/$(prefix)_vorticity.mp4", 1:Nt, framerate=10, px_per_unit=2) do nn
+    @info "Recording frame $nn"
+    n[] = nn
+end
+#%%
