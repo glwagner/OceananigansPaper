@@ -253,7 +253,9 @@ simulation.output_writers[:jld2] = JLD2OutputWriter(model, outputs,
 
 simulation.output_writers[:averaged_jld2] = JLD2OutputWriter(model, outputs,
                                                              filename = "$(FILE_DIR)/averaged_fields",
-                                                             schedule = AveragedTimeInterval(1, window=1))
+                                                             schedule = AveragedTimeInterval(1, window=1),
+                                                             overwrite_existing = true,
+                                                             with_halos = true)
 
 run!(simulation)
 
