@@ -69,7 +69,8 @@ Nx = floor_to_base2(1 / Re^-0.75 * (3.8568 * α + 5.142))
 Ny = floor_to_base2(1 / Re^-0.75 * 0.1)
 
 Δx = Lx / Nx
-Δt = max_Δt = 0.2 * Δx^2 * Re
+max_Δt = 0.2 * Δx^2 * Re
+Δt = min(Δx / U₀ * 0.1, max_Δt)
 
 μᵤ = 1 / (Δt * 100)
 
@@ -158,6 +159,7 @@ forcing = (; u=u_forcing)
 
 advection = Centered(order=2)
 closure = ScalarDiffusivity(ν=1/Re)
+timestepper = :RungeKutta3
 
 no_slip = ValueBoundaryCondition(0)
 velocity_bcs = FieldBoundaryConditions(top=no_slip, bottom=no_slip, immersed=no_slip)
@@ -183,7 +185,7 @@ if isnothing(pressure_solver)
 end
 
 model = NonhydrostaticModel(; grid, velocities, pressure_solver, closure,
-                            advection, forcing, boundary_conditions, auxiliary_fields)
+                            advection, forcing, boundary_conditions, auxiliary_fields, timestepper)
 
 @show model
 
@@ -248,6 +250,10 @@ simulation.output_writers[:jld2] = JLD2OutputWriter(model, outputs,
                                                     filename = "$(OUTPUT_DIR)/fields.jld2",
                                                     overwrite_existing = true,
                                                     with_halos = true)
+
+simulation.output_writers[:averaged_jld2] = JLD2OutputWriter(model, outputs,
+                                                             filename = "$(FILE_DIR)/averaged_fields",
+                                                             schedule = AveragedTimeInterval(1, window=1))
 
 run!(simulation)
 
