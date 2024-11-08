@@ -159,7 +159,7 @@ forcing = (; u=u_forcing)
 
 advection = Centered(order=2)
 closure = ScalarDiffusivity(ν=1/Re)
-timestepper = :RungeKutta3
+timestepper = :QuasiAdamsBashforth2
 
 no_slip = ValueBoundaryCondition(0)
 velocity_bcs = FieldBoundaryConditions(top=no_slip, bottom=no_slip, immersed=no_slip)
@@ -190,7 +190,7 @@ model = NonhydrostaticModel(; grid, velocities, pressure_solver, closure,
 @show model
 
 simulation = Simulation(model; Δt, stop_time)
-conjure_time_step_wizard!(simulation, cfl=0.6, IterationInterval(3); max_Δt, max_change=1.05)
+conjure_time_step_wizard!(simulation, cfl=0.5, IterationInterval(3); max_Δt, max_change=1.05)
 
 wall_time = Ref(time_ns())
 
