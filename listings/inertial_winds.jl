@@ -1,16 +1,21 @@
 using Oceananigans
 using Oceananigans.Units
-using Printf
 
-x = y = (0, 512)
-z = (-256, 0)
-grid = RectilinearGrid(CPU(); size=(32, 32, 32), halo=(5, 5, 5), x, y, z)
+grid = RectilinearGrid(GPU();
+                       size = (256, 256, 256),
+                       halo = (5, 5, 5),
+                       x = (0, 512),
+                       y = (0, 512),
+                       z = (-256, 0))
 
-@inline τx(x, y, t, p) = p.τ₀ * exp(-t^2 / (2 * p.T^2))
-u_top_bc = FluxBoundaryCondition(τx, parameters=(τ₀=1e-3, T=12hours))
+@inline τx(x, y, t, δ) = - 1e-3 * exp(-t^2 / 2δ)
+u_top_bc = FluxBoundaryCondition(τx, parameters=12hours)
 u_bcs = FieldBoundaryConditions(top=u_top_bc)
 
-model = NonhydrostaticModel(; grid,
+@inline ∂z_uˢ(z, t) = 0.01 * exp(z / 8)
+stokes_drift = UniformStokesDrift(; ∂z_uˢ)
+
+model = NonhydrostaticModel(; grid, stokes_drift,
                             tracers = :b,
                             buoyancy = BuoyancyTracer(),
                             boundary_conditions = (; u=u_bcs),
@@ -19,12 +24,14 @@ model = NonhydrostaticModel(; grid,
                             
 N² = 1e-5
 Δz = minimum_zspacing(grid)
-bᵢ(x, y, z) = 1e-5 * z + 1e-2 * N² * Δz * randn()
+bᵢ(x, y, z) = N² * z + 1e-2 * N² * Δz * randn()
 set!(model, b=bᵢ)
 
-simulation = Simulation(model, Δt=1minute, stop_time=24hours)
+
+simulation = Simulation(model, Δt=10.0, stop_time=36hours)
 conjure_time_step_wizard!(simulation, cfl=0.7)
 
+using Printf
 function progress(sim)
     u, v, w = sim.model.velocities
     msg = @sprintf("Iter: %d, time: %s, max|u|: (%.2e, %.2e, %.2e)",
