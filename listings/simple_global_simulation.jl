@@ -1,8 +1,8 @@
 using Oceananigans
 using Oceananigans.Units
-using Dates, CFTime
 import ClimaOcean
-using Printf
+using Dates
+using CFTime
 
 Nz = 40
 z = ClimaOcean.exponential_z_faces(; Nz, depth=5000)
@@ -26,6 +26,8 @@ set!(ocean.model, T = ClimaOcean.ECCOMetadata(:temperature; dates),
 atmosphere = ClimaOcean.JRA55_prescribed_atmosphere(arch)
 coupled_model = ClimaOcean.OceanSeaIceModel(ocean; atmosphere)
 simulation = Simulation(coupled_model, Δt=5minutes, stop_time=4 * 360days)
+
+using Printf
 
 wall_time = Ref(time_ns())
 sim_time = Ref(time(simulation))
