@@ -57,7 +57,8 @@ add_callback!(simulation, progress, IterationInterval(100))
 u, v, w = model.velocities
 ζ = ∂x(v) - ∂y(u)
 s = @at (Center, Center, Center) sqrt(u^2 + v^2)
-outputs = merge(model.velocities, model.tracers, (; ζ, s))
+∇b² = @at (Center, Center, Center) ∂x(b)^2 + ∂y(b)^2
+outputs = merge(model.velocities, model.tracers, (; ζ, s, ∇b²))
 
 xy = JLD2OutputWriter(model, outputs,
                       filename = "eady_les.jld2",
@@ -69,10 +70,3 @@ simulation.output_writers[:xy] = xy
 
 run!(simulation)
 
-using GLMakie
-
-u, v, w = model.velocities
-ζ = Field(∂x(v) - ∂y(u), indices=(:, :, Nz))
-compute!(ζ)
-
-heatmap(ζ)
