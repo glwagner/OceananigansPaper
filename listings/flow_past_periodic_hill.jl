@@ -52,7 +52,7 @@ end
 args = parse_commandline()
 
 arch = GPU()
-stop_time = 500
+stop_time = 10
 Re = args["Re"]
 solver = args["solver"]
 α = args["alpha"]
@@ -64,12 +64,18 @@ Lx = (3.8568 * α + 5.142) * H
 Ly = 0.1H
 Lz = 3.036H
 
-Nz = floor_to_base2(1 / Re^-0.75 * 3.036)
-Nx = floor_to_base2(1 / Re^-0.75 * (3.8568 * α + 5.142))
-Ny = floor_to_base2(1 / Re^-0.75 * 0.1)
+if Re ≈ 5600
+    Nz = 512
+    Nx = 1500
+    Ny = 64
+else
+    Nz = floor_to_base2(1 / Re^-0.75 * 3.036)
+    Nx = floor_to_base2(1 / Re^-0.75 * (3.8568 * α + 5.142))
+    Ny = floor_to_base2(1 / Re^-0.75 * 0.1)
+end
 
 Δx = Lx / Nx
-max_Δt = 0.2 * Δx^2 * Re
+max_Δt = 0.5 * Δx^2 * Re
 Δt = min(Δx / U₀ * 0.1, max_Δt)
 
 μᵤ = 1 / (Δt * 100)
@@ -123,7 +129,7 @@ periodic_hill(x, y, z) = hill(x, y, z) | hill(-x + Lx, y, z)
 # zs = hill.(xs, α, H) .+ hill.(-xs .+ Lx, α, H)
 
 FILE_DIR = "./Output"
-prefix = "flow_past_periodic_hill_$(solver)_Re$(Re)_alpha$(α)"
+prefix = "flow_past_periodic_hill_$(solver)_Re$(Re)_alpha$(α)_Nxyz_$(Nx)x$(Ny)x$(Nz)"
 
 x = (0, Lx)
 y = (0, Ly)
@@ -159,7 +165,7 @@ forcing = (; u=u_forcing)
 
 advection = Centered(order=2)
 closure = ScalarDiffusivity(ν=1/Re)
-timestepper = :QuasiAdamsBashforth2
+timestepper = :RungeKutta3
 
 no_slip = ValueBoundaryCondition(0)
 velocity_bcs = FieldBoundaryConditions(top=no_slip, bottom=no_slip, immersed=no_slip)
@@ -190,7 +196,7 @@ model = NonhydrostaticModel(; grid, velocities, pressure_solver, closure,
 @show model
 
 simulation = Simulation(model; Δt, stop_time)
-conjure_time_step_wizard!(simulation, cfl=0.5, IterationInterval(3); max_Δt, max_change=1.05)
+conjure_time_step_wizard!(simulation, cfl=0.7, IterationInterval(3); max_Δt, max_change=1.05)
 
 wall_time = Ref(time_ns())
 
@@ -311,8 +317,7 @@ title = @lift "Re = $(Re), t = $(ubar_data.times[$n])"
 Label(fig[0, :], title, font=:bold, tellwidth=false)
 trim!(fig.layout)
 
-# save("./$(OUTPUT_DIR)/$(prefix)_velocities.png", fig, px_per_unit = 4)
-CairoMakie.record(fig, "./$(OUTPUT_DIR)/$(prefix)_velocities.mp4", 1:Nt, framerate=10, px_per_unit=2) do nn
+CairoMakie.record(fig, "./$(OUTPUT_DIR)/$(prefix)_velocities.mp4", 1:Nt, framerate=3, px_per_unit=2) do nn
     @info "Recording frame $nn"
     n[] = nn
 end
@@ -343,8 +348,7 @@ title = @lift "Re = $(Re), t = $(ubar_data.times[$n])"
 Label(fig[0, :], title, font=:bold, tellwidth=false)
 trim!(fig.layout)
 
-# save("./$(OUTPUT_DIR)/$(prefix)_velocities.png", fig, px_per_unit = 4)
-CairoMakie.record(fig, "./$(OUTPUT_DIR)/$(prefix)_vorticity.mp4", 1:Nt, framerate=10, px_per_unit=2) do nn
+CairoMakie.record(fig, "./$(OUTPUT_DIR)/$(prefix)_vorticity.mp4", 1:Nt, framerate=3, px_per_unit=2) do nn
     @info "Recording frame $nn"
     n[] = nn
 end
