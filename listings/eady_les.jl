@@ -2,13 +2,13 @@ using Oceananigans
 using Oceananigans.Units
 using Printf
 
-arch = CPU()
-x = y = (0, 4kilometers)
+arch = GPU()
+x = y = (0, 4096)
 z = (-256, 0)
-Nx = Ny = 64
-Nz = 16
+Nx = Ny = 512
+Nz = 64
 
-grid = RectilinearGrid(arch, size=(Nx, Ny, Nz); x, y, z)
+grid = RectilinearGrid(arch, size=(Nx, Ny, Nz); x, y, z, topology=(Periodic, Periodic, Bounded))
 
 # Background flow is Ψ = Λ y z
 # corresponding to geostrophic shear U = Λ z
@@ -37,21 +37,35 @@ model = NonhydrostaticModel(; grid, background_fields,
 bᵢ(x, y, z) = N² * z + 1e-2 * N² * Δz * (2rand() - 1)
 set!(model, b=bᵢ)
 
-simulation = Simulation(model, Δt=10minutes, stop_time=30days)
+simulation = Simulation(model, Δt=10minutes, stop_time=10days)
 conjure_time_step_wizard!(simulation, cfl=0.7)
 
 wallclock = Ref(time_ns())
 function progress(sim)
     elapsed = 1e-9 * (time_ns() - wallclock[])
-    msg = @sprintf("Iter: %d, time: %s, Δt: %s, wall time: %s",
-                   iteration(sim), prettytime(sim), prettytime(sim.Δt), prettytime(elapsed))
+    u, v, w = sim.model.velocities
+    msg = @sprintf("Iter: %d, time: %s, Δt: %s, wall time: %s, max|𝐮|: (%.2f, %.2f, %.2f)",
+                   iteration(sim), prettytime(sim), prettytime(sim.Δt), prettytime(elapsed),
+                   maximum(abs, u), maximum(abs, v), maximum(abs, w)) 
     @info msg
     wallclock[] = time_ns()
     return nothing
 end
 
-add_callback!(simulation, progress, IterationInterval(10))
+add_callback!(simulation, progress, IterationInterval(100))
 
+u, v, w = model.velocities
+ζ = ∂x(v) - ∂y(u)
+s = @at (Center, Center, Center) sqrt(u^2 + v^2)
+outputs = merge(model.velocities, model.tracers, (; ζ, s))
+
+xy = JLD2OutputWriter(model, outputs,
+                      filename = "eady_les.jld2",
+                      schedule = TimeInterval(10minutes),
+                      indices = (:, :, Nz),
+                      overwrite_existing = true)
+
+simulation.output_writers[:xy] = xy
 
 run!(simulation)
 
