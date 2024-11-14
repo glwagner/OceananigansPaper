@@ -52,7 +52,7 @@ end
 args = parse_commandline()
 
 arch = GPU()
-stop_time = 10
+stop_time = 200
 Re = args["Re"]
 solver = args["solver"]
 α = args["alpha"]
