@@ -1,8 +1,9 @@
 using Oceananigans
 using Oceananigans.Units
-using SeawaterBuoyancy
+using SeawaterPolynomials
 
-H, L, δ, N = 1024, 256, L/2, 64
+H, L = 1024, 256
+δ, N = L/2, 64
 x, y, z = (-2L, 2L), (-L, L), (-H, 0)
 
 grid = RectilinearGrid(GPU(); size=(2N, 4N, N), halo=(6, 6, 6),
@@ -17,14 +18,13 @@ T₂ = 12.421hours
 U₂ = 0.15 # m/s
 @inline Fu(x, y, z, t, p) = 2π * p.U₂ / p.T₂ * cos(2π * t / p.T₂)
 
-equation_of_state = TEOS10EquationOfState()
+equation_of_state = SeawaterPolynomials.TEOS10EquationOfState()
 buoyancy = SeawaterBuoyancy(; equation_of_state)
 
-model = NonhydrostaticModel(; grid, advection = WENO(order=9),
-                            
-                            forcing = (u=Forcing(Fu, parameters=(; U₂, T₂))),
+model = NonhydrostaticModel(; grid, buoyancy, advection = WENO(order=9),
+                            forcing = (; u=Forcing(Fu, parameters=(; U₂, T₂))),
                             coriolis = FPlane(latitude=47.5),
-                            tracers = (:T, :S), buoyancy
+                            tracers = (:T, :S))
 
 Tᵢ(x, y, z) = 12 + 4z / H
 set!(model, T=Tᵢ, S=32, u=0.15)
