@@ -5,7 +5,7 @@ using SeawaterPolynomials
 H, L, δ, Nz = 256, 1024, 512, 64
 x, y, z = (-2L, 2L), (-L, L), (-H, 0)
 
-grid = RectilinearGrid(GPU(); size=(2Nz, 4Nz, Nz), halo=(6, 6, 6),
+grid = RectilinearGrid(GPU(); size=(4Nz, 2Nz, Nz), halo=(6, 6, 6),
                        x, y, z, topology=(Periodic, Bounded, Bounded))
 
 bowl(y) = 1 + (y / L)^2
@@ -13,17 +13,18 @@ wedge(x, y) = 1 + (y + abs(x)) / δ
 bowl_wedge(x, y) = -H * min(bowl(y), wedge(x, y))
 grid = ImmersedBoundaryGrid(grid, GridFittedBottom(bowl_wedge))
 
+@show grid
+
 T₂ = 12.421hours
 U₂ = 0.15 # m/s
 @inline Fu(x, y, z, t, p) = 2π * p.U₂ / p.T₂ * cos(2π * t / p.T₂)
+forcing = (; u=Forcing(Fu, parameters=(; U₂, T₂)))
 
 equation_of_state = SeawaterPolynomials.TEOS10EquationOfState()
 buoyancy = SeawaterBuoyancy(; equation_of_state)
 
-model = NonhydrostaticModel(; grid, buoyancy, advection = WENO(order=9),
-                            forcing = (; u=Forcing(Fu, parameters=(; U₂, T₂))),
-                            coriolis = FPlane(latitude=47.5),
-                            tracers = (:T, :S))
+model = NonhydrostaticModel(; grid, tracers = (:T, :S), buoyancy, forcing,
+                            advection = WENO(order=9), coriolis = FPlane(latitude=47.5))
 
 Tᵢ(x, y, z) = 12 + 4z / H
 set!(model, T=Tᵢ, S=32, u=0.15)
@@ -52,20 +53,20 @@ prefix = "flow_past_headland_$Nz"
 u, v, w = model.velocities
 ζ = ∂x(v) - ∂y(u)
 s = @at (Center, Center, Center) sqrt(u^2 + v^2)
-xy = JLD2OutputWriter(model, merge(model.velocities, model.tracers, (; ζ, s)),
+outputs = merge(model.velocities, model.tracers, (; ζ, s))
+
+xy = JLD2OutputWriter(model, outputs,
                       indices = (:, :, grid.Nz),
                       schedule = TimeInterval(10minutes),
-                      filename = prefix * "_xy.jld2"
+                      filename = prefix * "_xy.jld2",
                       overwrite_existing = true)
 
-xz = JLD2OutputWriter(model, merge(model.velocities, model.tracers, (; ζ, s)),
+xz = JLD2OutputWriter(model, outputs,
                       indices = (:, grid.Ny÷2, :),
                       schedule = TimeInterval(10minutes),
-                      filename = prefix * "_xz.jld2"
+                      filename = prefix * "_xz.jld2",
                       overwrite_existing = true)
 
 simulation.output_writers[:xy] = xy
 simulation.output_writers[:xz] = xz
-
-run!(simulation)
 
