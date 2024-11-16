@@ -2,10 +2,10 @@ using Oceananigans
 using Oceananigans.Units
 using SeawaterPolynomials
 
-H, L, δ, N = 256, 1024, 512, 64
+H, L, δ, Nz = 256, 1024, 512, 64
 x, y, z = (-2L, 2L), (-L, L), (-H, 0)
 
-grid = RectilinearGrid(GPU(); size=(2N, 4N, N), halo=(6, 6, 6),
+grid = RectilinearGrid(GPU(); size=(2Nz, 4Nz, Nz), halo=(6, 6, 6),
                        x, y, z, topology=(Periodic, Bounded, Bounded))
 
 bowl(y) = 1 + (y / L)^2
@@ -48,16 +48,24 @@ end
 
 add_callback!(simulation, progress, IterationInterval(10))
 
+prefix = "flow_past_headland_$Nz"
 u, v, w = model.velocities
 ζ = ∂x(v) - ∂y(u)
 s = @at (Center, Center, Center) sqrt(u^2 + v^2)
 xy = JLD2OutputWriter(model, merge(model.velocities, model.tracers, (; ζ, s)),
                       indices = (:, :, grid.Nz),
                       schedule = TimeInterval(10minutes),
-                      filename = "flow_past_headland.jld2",
+                      filename = prefix * "_xy.jld2"
+                      overwrite_existing = true)
+
+xz = JLD2OutputWriter(model, merge(model.velocities, model.tracers, (; ζ, s)),
+                      indices = (:, grid.Ny÷2, :),
+                      schedule = TimeInterval(10minutes),
+                      filename = prefix * "_xz.jld2"
                       overwrite_existing = true)
 
 simulation.output_writers[:xy] = xy
+simulation.output_writers[:xz] = xz
 
 run!(simulation)
 
