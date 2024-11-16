@@ -2,8 +2,7 @@ using Oceananigans
 using Oceananigans.Units
 using SeawaterPolynomials
 
-H, L = 1024, 256
-δ, N = L/2, 64
+H, L, δ, N = 256, 1024, 512, 64
 x, y, z = (-2L, 2L), (-L, L), (-H, 0)
 
 grid = RectilinearGrid(GPU(); size=(2N, 4N, N), halo=(6, 6, 6),
