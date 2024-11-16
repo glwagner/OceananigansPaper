@@ -10,7 +10,7 @@ grid = RectilinearGrid(GPU(); size=(2N, 4N, N), halo=(6, 6, 6),
 
 bowl(y) = 1 + (y / L)^2
 wedge(x, y) = 1 + (y + abs(x)) / δ
-bowl_wedge(x, y) = -H * max(bowl(y), wedge(x, y))
+bowl_wedge(x, y) = -H * min(bowl(y), wedge(x, y))
 grid = ImmersedBoundaryGrid(grid, GridFittedBottom(bowl_wedge))
 
 T₂ = 12.421hours
