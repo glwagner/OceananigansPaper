@@ -18,13 +18,7 @@ W = grid.Lx - 4δ
 positions = W .* (rand(seamounts) .- 1/2) # ∈ [-Lx/2+2δ, Lx/2-2δ]
 heights = h₀ .* (1 .+ rand(seamounts))    # ∈ [h₀, 2h₀]
 
-function bottom(x)
-    z = - H
-    for (h, ξ) in zip(heights, positions)
-        z += h * exp(-(x - ξ)^2 / 2δ^2)
-    end
-    return z
-end
+bottom(x) = -H + sum(h * exp(-(x - ξ)^2 / (2δ^2)) for (h, ξ) in zip(heights, positions))
 
 grid = ImmersedBoundaryGrid(grid, GridFittedBottom(bottom))
 
