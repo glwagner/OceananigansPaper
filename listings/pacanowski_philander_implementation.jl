@@ -47,6 +47,9 @@ add_callback!(simulation, compute_diffusivities!)
 run!(simulation)
 
 using GLMakie
+
+set_theme!(Theme(linewidth=3, linealpha=0.6))
+
 fig = Figure(size=(800, 400))
 axb = Axis(fig[1, 1], xlabel="Buoyancy", ylabel="z (m)")
 axu = Axis(fig[1, 2], xlabel="x-velocity")
