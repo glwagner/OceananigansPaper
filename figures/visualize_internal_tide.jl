@@ -16,9 +16,9 @@ heatmap!(ax, wn, colormap=:balance, colorrange=(-wlim, wlim), nan_color=:gray)
 hidedecorations!(ax)
 display(fig)
 
+save("random_internal_tide", fig)
+
 record(fig, "internal_tide.mp4", 1:Nt, framerate=24) do nn
     @info "Drawing frame $nn of $Nt..."
     n[] = nn
 end
-
-
