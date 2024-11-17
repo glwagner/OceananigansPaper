@@ -5,7 +5,10 @@ filename = "random_topography_internal_tide.jld2"
 wt = FieldTimeSeries(filename, "w")
 Nt = length(wt)
 
-n = Observable(Nt)
+T₂ = 12.421hours # period of M₂ tide constituent
+_, idx = findmin(abs.(wt.times .- 8T₂))
+
+n = Observable(idx)
 wn = @lift wt[$n]
 
 wlim = maximum(abs, wt) * 3/4
@@ -16,9 +19,9 @@ heatmap!(ax, wn, colormap=:balance, colorrange=(-wlim, wlim), nan_color=:gray)
 hidedecorations!(ax)
 display(fig)
 
-save("random_internal_tide", fig)
+save("random_internal_tide.png", fig)
 
-record(fig, "internal_tide.mp4", 1:Nt, framerate=24) do nn
+record(fig, "random_internal_tide.mp4", 1:Nt, framerate=24) do nn
     @info "Drawing frame $nn of $Nt..."
     n[] = nn
 end
