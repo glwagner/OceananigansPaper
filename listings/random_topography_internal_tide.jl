@@ -15,10 +15,10 @@ using Random: seed!
 seed!(123)
 seamounts = 42
 W = grid.Lx - 4δ
-positions = W .* (rand(seamounts) .- 1/2) # ∈ [-Lx/2+2δ, Lx/2-2δ]
-heights = h₀ .* (1 .+ rand(seamounts))    # ∈ [h₀, 2h₀]
+x₀ = W .* (rand(seamounts) .- 1/2) # mountains' positions ∈ [-Lx/2+2δ, Lx/2-2δ]
+h  = h₀ .* (1 .+ rand(seamounts))  # mountains' heights ∈ [h₀, 2h₀]
 
-bottom(x) = -H + sum(heights[m] * exp(-(x - positions[m])^2 / 2δ^2) for m in 1:seamounts)
+bottom(x) = -H + sum(h[s] * exp(-(x - x₀[s])^2 / 2δ^2) for s = 1:seamounts)
 
 grid = ImmersedBoundaryGrid(grid, GridFittedBottom(bottom))
 
