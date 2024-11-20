@@ -15,14 +15,15 @@ np = (30, 290, 396)
 # mask_immersed_field! is giving me a segfault.
 # This is a workaround.
 Nx, Ny, Nz, Nt = size(ut)
+Nz_top = ut.grid.underlying_grid.Nz
 for n in np
     @inbounds for i = 1:Nx, j=1:Ny
-        if ut[i, j, 64, n] == 0
-            ut[i, j, 64, n] = NaN
+        if ut[i, j, Nz_top, n] == 0
+            ut[i, j, Nz_top, n] = NaN
         end
 
-        if Tt[i, j, 64, n] == 0
-            Tt[i, j, 64, n] = NaN
+        if Tt[i, j, Nz_top, n] == 0
+            Tt[i, j, Nz_top, n] = NaN
         end
     end
 

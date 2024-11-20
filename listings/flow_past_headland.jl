@@ -70,3 +70,4 @@ xz = JLD2OutputWriter(model, outputs,
 simulation.output_writers[:xy] = xy
 simulation.output_writers[:xz] = xz
 
+run!(simulation)
