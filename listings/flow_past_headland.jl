@@ -2,10 +2,11 @@ using Oceananigans
 using Oceananigans.Units
 using SeawaterPolynomials
 
-H, L, δ, Nz = 256, 1024, 512, 64
-x, y, z = (-2L, 2L), (-L, L), (-H, 0)
+H, L, δ = 256meters, 1024meters, 512meters
+x, y, z = (-3L, 3L), (-L, L), (-H, 0)
+Nz = 64
 
-grid = RectilinearGrid(GPU(); size=(4Nz, 2Nz, Nz), halo=(6, 6, 6),
+grid = RectilinearGrid(GPU(); size=(6Nz, 2Nz, Nz), halo=(6, 6, 6),
                        x, y, z, topology=(Periodic, Bounded, Bounded))
 
 bowl(y) = 1 + (y / L)^2
