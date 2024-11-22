@@ -43,7 +43,7 @@ Colorbar(fig[2, 2], hmζ, vertical=false, label="z-vorticity (s⁻¹)", width=Re
 xtxt = 0.03
 ytxt = 0.97
 T₂ = 12.421hours
-title = @lift @sprintf("2π t / T₂ = %1.2f", ut.times[$n])
+title = @lift @sprintf("2π t / T₂ = %1.2f", ut.times[$n] / T₂)
 text!(axu, xtxt, ytxt; text=title, space=:relative, color=:white, align=(:left, :top), fontsize=18)
 
 
