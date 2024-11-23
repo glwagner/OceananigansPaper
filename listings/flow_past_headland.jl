@@ -35,9 +35,9 @@ model = NonhydrostaticModel(; grid, tracers = (:T, :S), buoyancy, forcing,
                             boundary_conditions = (; T=temperature_bcs))
 
 Tᵢ(x, y, z) = 12 + 4z / H
-set!(model, T=Tᵢ, S=32)
+set!(model, T=Tᵢ, S=32, u=U₂/2)
 
-simulation = Simulation(model, Δt=10, stop_time=3days)
+simulation = Simulation(model, Δt=5, stop_time=3days)
 conjure_time_step_wizard!(simulation, cfl=0.7)
 
 using Printf

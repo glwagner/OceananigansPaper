@@ -29,12 +29,12 @@ Colorbar(fig[0, 2], hmT, vertical=false, label="Temperature (ᵒC)", width=Relat
 
 wn = @lift interior(wt[$n], :, :, 1)
 axw = Axis(fig[3, 1], aspect=DataAspect(), xlabel="x (m)", ylabel="y (m)", width=500)
-hmw = heatmap!(axw, x, y, wn, nan_color=:lightgray, colormap=:balance, colorrange=(-0.06, 0.06))
+hmw = heatmap!(axw, x, y, wn, nan_color=:lightgray, colormap=:balance, colorrange=(-0.03, 0.03))
 Colorbar(fig[2, 1], hmw, vertical=false, label="z-velocity (m s⁻¹)", width=Relative(0.5))
 
 ζn = @lift interior(ζt[$n], :, :, 1)
 axζ = Axis(fig[3, 2], aspect=DataAspect(), xlabel="x (m)", ylabel="y (m)", width=500)
-hmζ = heatmap!(axζ, x, y, ζn, nan_color=:lightgray, colormap=:balance, colorrange=(-0.01, 0.01))
+hmζ = heatmap!(axζ, x, y, ζn, nan_color=:lightgray, colormap=:balance, colorrange=(-0.005, 0.005))
 Colorbar(fig[2, 2], hmζ, vertical=false, label="z-vorticity (s⁻¹)", width=Relative(0.5))
 
 xtxt = 0.03
