@@ -14,8 +14,7 @@ function refinement_error(scheme)
         compute_tendencies!(model, [])
         rhs_analytical = set!(CenterField(grid), x -> - 6π * cos(6π * x)) # The analytical tendency
         rhs_numerical = model.timestepper.Gⁿ.c # The computed tendency
-        # push!(error, norm(rhs_analytical - rhs_numerical) / N^(0.5)) # L2 error
-        push!(error, maximum(abs, rhs_analytical - rhs_numerical)) # Linf error
+        push!(error, norm(rhs_analytical - rhs_numerical) / N^(0.5)) # L2 error
     end
 
     return error
