@@ -49,10 +49,13 @@ ax1 = Axis(fig[1, 1], xlabel="x", title="Linear reconstruction")
 
 stop_time = 2.0
 c = advect_tracer(Centered(order=2); stop_time)
-lines!(ax1, c, label="t=$(stop_time), Centered(order=2)", color = :red)
+lines!(ax1, c, label="t=$(stop_time), Centered(order=2)", color = :firebrick1)
 
 c = advect_tracer(UpwindBiased(order=3); stop_time)
-lines!(ax1, c, label="t=$(stop_time), UpwindBiased(order=3)", color = :blue)
+lines!(ax1, c, label="t=$(stop_time), UpwindBiased(order=3)", color = :plum)
+
+c = advect_tracer(UpwindBiased(order=1); stop_time)
+lines!(ax1, c, label="t=$(stop_time), UpwindBiased(order=1)", color = :salmon1)
 
 solution(x) = cᵢ(x)
 set!(c, solution)
@@ -60,16 +63,16 @@ lines!(ax1, c, linestyle=:dash, color=(:black, 0.2))
 xlims!(ax1, -1, 1)
 ylims!(ax2, -0.5, 1.5)
 
-ax2 = Axis(fig[1, 2], xlabel="x", title="WENO reconstruction") #, ylabel="c(t=4)")
+ax2 = Axis(fig[1, 2], xlabel="x", title="WENO reconstruction") 
 stop_time = 2.0
 
 scheme = WENO(order=3)
 c = advect_tracer(scheme; stop_time)
-lines!(ax2, c, label="t=$(stop_time), WENO(order=3)", color=:green)
+lines!(ax2, c, label="t=$(stop_time), WENO(order=3)", color=:dodgerblue3)
 
 scheme = WENO(order=9)
 c = advect_tracer(scheme; stop_time)
-lines!(ax2, c, label="t=$(stop_time), WENO(order=9)", color=:grey)
+lines!(ax2, c, label="t=$(stop_time), WENO(order=9)", color=:lightskyblue)
 
 solution(x) = cᵢ(x)
 set!(c, solution)
