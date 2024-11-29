@@ -25,62 +25,71 @@ const α = 10
 end
 
 """
-    advect_tracer(tracer_advection, closure=nothing, Nx=128)
+    advect_tracer(advection, closure=nothing, Nx=128)
 
-Advect a tracer with a top-hat profile until `stop_time` using `Nx` grid points.
+Advect a tracer profile until `stop_time` using `Nx` grid points.
 """
-function advect_tracer(tracer_advection; closure=nothing, Nx=128, stop_time=1)
+function advect_tracer(advection; closure=nothing, Nx=128, stop_time=1)
     grid = RectilinearGrid(size=Nx, x=(-1, 1), halo=6, topology=(Periodic, Flat, Flat))
 
-    model = NonhydrostaticModel(; grid, closure, tracer_advection, tracers = :c)
+    model = NonhydrostaticModel(; grid, closure, advection, tracers = :c)
 
     set!(model, u=1, c=cᵢ)
-    simulation = Simulation(model; Δt=0.5/Nx, stop_time)
+    simulation = Simulation(model; Δt=0.7/Nx, stop_time)
     run!(simulation)
     return model.tracers.c
 end
 
 using GLMakie
 
-set_theme!(Theme(fontsize=18, linewidth=3, linealpha=0.6))
+set_theme!(Theme(fontsize=18, linewidth=2, linealpha=0.6))
 
-fig = Figure(size=(800, 240))
-ax = Axis(fig[1, 1], xlabel="x") #, ylabel="c(t=4)")
+fig = Figure(size=(1400, 500))
+ax1 = Axis(fig[1, 1], xlabel="x", title="Linear reconstruction") 
 
-stop_time = 0.1
+stop_time = 2.0
 c = advect_tracer(Centered(order=2); stop_time)
-lines!(ax, c, label="t=0.1, Centered(order=2)")
+lines!(ax1, c, label="t=$(stop_time), Centered(order=2)", color = :red)
 
 c = advect_tracer(UpwindBiased(order=3); stop_time)
-lines!(ax, c, label="t=0.1, UpwindBiased(order=3)")
-
-#c = advect_tracer(UpwindBiased(order=5); stop_time)
-#lines!(ax, c, label="UpwindBiased(order=5)")
-
-stop_time = 4
-
-for N = (5, 11)
-    scheme = WENO(order=N)
-    c = advect_tracer(scheme; stop_time)
-    lines!(ax, c, label="t=4, WENO(order=$N)")
-end
+lines!(ax1, c, label="t=$(stop_time), UpwindBiased(order=3)", color = :blue)
 
 solution(x) = cᵢ(x)
 set!(c, solution)
-lines!(ax, c, linestyle=:dash, color=(:black, 0.2), label="Initial condition")
+lines!(ax1, c, linestyle=:dash, color=(:black, 0.2))
+xlims!(ax1, -1, 1)
+ylims!(ax2, -0.5, 1.5)
 
-solution(x) = cᵢ(x-stop_time) > 1 ? 0 : 1 
+ax2 = Axis(fig[1, 2], xlabel="x", title="WENO reconstruction") #, ylabel="c(t=4)")
+stop_time = 2.0
+
+scheme = WENO(order=3)
+c = advect_tracer(scheme; stop_time)
+lines!(ax2, c, label="t=$(stop_time), WENO(order=3)", color=:green)
+
+scheme = WENO(order=9)
+c = advect_tracer(scheme; stop_time)
+lines!(ax2, c, label="t=$(stop_time), WENO(order=9)", color=:grey)
+
+solution(x) = cᵢ(x)
 set!(c, solution)
-lines!(ax, c, linestyle=:dash, color=(:black, 0.6), label="Exact solution at t=4")
+lines!(ax2, c, linestyle=:dash, color=(:black, 0.2), label="Exact solution at t=$(stop_time)")
 
-# c = advect_tracer(WENO(order=11), closure=ScalarDiffusivity(κ=0.04))
-# lines!(ax, c, label="WENO(order=11) with κ=0.04")
+xlims!(ax2, -1,  1)
+ylims!(ax2, -0.5, 1.5)
 
-xlims!(ax, -2, 6)
-hidespines!(ax, :t, :r, :l)
-hideydecorations!(ax, grid=false)
+plots_in_fig  = AbstractPlot[]
+labels_in_fig = AbstractString[]
+for ax in (ax1, ax2)
+    pl, lb = Makie.get_labeled_plots(ax, merge=false, unique=false)
+    append!(plots_in_fig, pl)
+    append!(labels_in_fig, lb)
+end
 
-Legend(fig[1, 0], ax, framevisible=false)
+ulabels = Base.unique(labels_in_fig)
+mergedplots = [[lp for (i, lp) in enumerate(plots_in_fig) if labels_in_fig[i] == ul] for ul in ulabels]
+
+Legend(fig[1, 0], mergedplots, ulabels)
 
 display(fig)
 
