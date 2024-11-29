@@ -45,7 +45,7 @@ using GLMakie
 set_theme!(Theme(fontsize=18, linewidth=3, linealpha=0.6))
 
 fig = Figure(size=(1400, 500))
-ax1 = Axis(fig[1, 1], xlabel="x", title="Linear reconstruction") 
+ax1 = Axis(fig[1, 1], xlabel="x", title="Linear reconstruction", yticks=[-1.5, -1, 0, 1, 1.5])  
 
 stop_time = 2.0
 c = advect_tracer(Centered(order=2); stop_time)
@@ -65,9 +65,9 @@ solution(x) = cᵢ(x)
 set!(c, solution)
 lines!(ax1, c, linestyle=:dash, color=(:black, 0.2))
 xlims!(ax1, -1, 1)
-ylims!(ax2, -0.5, 1.5)
+ylims!(ax1, -0.5, 1.5)
 
-ax2 = Axis(fig[1, 2], xlabel="x", title="WENO reconstruction") 
+ax2 = Axis(fig[1, 2], xlabel="x", title="WENO reconstruction", yticks=([-1.5, -1, 0, 1, 1.5], ["", "", "", "", ""]))
 stop_time = 2.0
 
 scheme = WENO(order=3)
