@@ -42,20 +42,24 @@ end
 
 using GLMakie
 
-set_theme!(Theme(fontsize=18, linewidth=2, linealpha=0.6))
+set_theme!(Theme(fontsize=18, linewidth=3, linealpha=0.6))
 
 fig = Figure(size=(1400, 500))
 ax1 = Axis(fig[1, 1], xlabel="x", title="Linear reconstruction") 
 
 stop_time = 2.0
 c = advect_tracer(Centered(order=2); stop_time)
-lines!(ax1, c, label="t=$(stop_time), Centered(order=2)", color = :firebrick1)
+lines!(ax1, c, label="t=$(stop_time), Centered(order=2)", color = :palegreen3)
 
-c = advect_tracer(UpwindBiased(order=3); stop_time)
-lines!(ax1, c, label="t=$(stop_time), UpwindBiased(order=3)", color = :plum)
+# If we want to show that this is equivalent to UpwindBiased(order=1)
+# c = advect_tracer(Centered(order=2); closure = ScalarDiffusivity(κ=2/256), stop_time)
+# scatter!(ax1, c, label="t=$(stop_time), Centered(order=2) + diffusion", color = :palegreen3)
 
 c = advect_tracer(UpwindBiased(order=1); stop_time)
 lines!(ax1, c, label="t=$(stop_time), UpwindBiased(order=1)", color = :salmon1)
+
+c = advect_tracer(UpwindBiased(order=3); stop_time)
+lines!(ax1, c, label="t=$(stop_time), UpwindBiased(order=3)", color = :firebrick1)
 
 solution(x) = cᵢ(x)
 set!(c, solution)
