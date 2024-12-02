@@ -40,19 +40,24 @@ for order in (1, 3, 5, 7, 9)
 end
 
 N  = [32, 64, 128, 256, 512, 1024]
-plots = []
 
-fig = Figure()
-ax = Axis(fig[1, 1], xscale = log10, yscale = log10, title = "L2 errors")
+fig = Figure(size = (1200, 500))
+ax = Axis(fig[1, 1], xscale = log10, 
+                     yscale = log10, 
+                     title  = "L2 errors",
+                     xticks = ([32, 64, 128, 256, 512, 1024], string.([32, 64, 128, 256, 512, 1024])))
 for (o, order) in enumerate((1, 3, 5, 7, 9)), scheme in (:Centered, :UpwindBiased, :WENO)
-    push!(plots, lines!(ax, N, errors[scheme, order], label = label(scheme, order), color = colors[o], linestyle = style(scheme)))
+    lines!(ax, N, errors[scheme, order], label = label(scheme, order), color = colors[o], linestyle = style(scheme))
 end
-axislegend(position = :lb)
 
-ax = Axis(fig[1, 2], xscale = log10, title = "Order")
+ax = Axis(fig[1, 2], xscale = log10, 
+                     xticks = ([32, 64, 128, 256, 512, 1024], string.([32, 64, 128, 256, 512, 1024])),
+                     yticks = ([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+                     title = "Order")
 for (o, order) in enumerate((1, 3, 5, 7, 9)), scheme in (:Centered, :UpwindBiased, :WENO)
     lines!(ax, N[2:end], orders[scheme, order], label = label(scheme, order), color = colors[o], linestyle = style(scheme))
 end
 
-plots = plots |> Array{typeof(plots[1])}
-Legend(fig[1, 3], plots)
+Legend(fig[1, 3], ax)
+
+save("advection_order.png", fig)
