@@ -62,7 +62,10 @@ prefix = "flow_past_headland_$Nz"
 u, v, w = model.velocities
 ζ = ∂x(v) - ∂y(u)
 s = @at (Center, Center, Center) sqrt(u^2 + v^2)
-outputs = merge(model.velocities, model.tracers, (; ζ, s))
+
+using Oceanostics: ErtelPotentialVorticity
+q = ErtelPotentialVorticity(model, model.velocities..., model.tracers.T, model.coriolis)
+outputs = merge(model.velocities, model.tracers, (; ζ, s, q))
 
 xy_writer = JLD2OutputWriter(model, outputs,
                              indices = (:, :, grid.Nz),
@@ -75,8 +78,13 @@ xz_writer = JLD2OutputWriter(model, outputs,
                              schedule = TimeInterval(10minutes),
                              filename = prefix * "_xz.jld2",
                              overwrite_existing = true)
+xyz_writer = JLD2OutputWriter(model, outputs,
+                              schedule = TimeInterval(12hours),
+                              filename = prefix * "_xyz.jld2",
+                              overwrite_existing = true)
 
 simulation.output_writers[:xy] = xy_writer
 simulation.output_writers[:xz] = xz_writer
+simulation.output_writers[:xyz] = xyz_writer
 
 run!(simulation)
