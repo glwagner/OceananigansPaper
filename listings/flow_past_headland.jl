@@ -29,7 +29,7 @@ temperature_top_bc = FluxBoundaryCondition(surface_temperature_flux, parameters 
 temperature_bcs = FieldBoundaryConditions(top = temperature_top_bc)
 
 model = NonhydrostaticModel(; grid, tracers = (:T, :S), forcing,
-                            buoyancy = SeawaterBuoyancy(; equation_of_state = TEOS10EquationOfState),
+                            buoyancy = SeawaterBuoyancy(; equation_of_state = TEOS10EquationOfState()),
                             advection = WENO(order=9), coriolis = FPlane(latitude=47.5),
                             boundary_conditions = (; T=temperature_bcs))
 
