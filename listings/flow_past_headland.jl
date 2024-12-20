@@ -1,6 +1,6 @@
 using Oceananigans
 using Oceananigans.Units
-using SeawaterPolynomials
+using SeawaterPolynomials: TEOS10EquationOfState
 
 H, L, δ = 256meters, 1024meters, 512meters
 x, y, z = (-3L, 3L), (-L, L), (-H, 0)
@@ -19,8 +19,6 @@ U₂ = 0.1 # m/s
 @inline Fu(x, y, z, t, p) = 2π * p.U₂ / p.T₂ * sin(2π * t / p.T₂)
 forcing = (; u=Forcing(Fu, parameters=(; U₂, T₂)))
 
-equation_of_state = SeawaterPolynomials.TEOS10EquationOfState()
-buoyancy = SeawaterBuoyancy(; equation_of_state)
 
 Q = 250.0  # W m⁻², surface _heat_ flux
 ρₒ = 1026.0 # kg m⁻³, average density at the surface of the world ocean
@@ -30,7 +28,8 @@ surface_temperature_flux(x, y, t, p) = p.Jᵀ * (1 - exp(-t^4 / (p.time_delay^4)
 temperature_top_bc = FluxBoundaryCondition(surface_temperature_flux, parameters = (; Jᵀ, time_delay = 1day))
 temperature_bcs = FieldBoundaryConditions(top = temperature_top_bc)
 
-model = NonhydrostaticModel(; grid, tracers = (:T, :S), buoyancy, forcing,
+model = NonhydrostaticModel(; grid, tracers = (:T, :S), forcing,
+                            buoyancy = SeawaterBuoyancy(; equation_of_state = TEOS10EquationOfState),
                             advection = WENO(order=9), coriolis = FPlane(latitude=47.5),
                             boundary_conditions = (; T=temperature_bcs))
 
@@ -64,7 +63,8 @@ u, v, w = model.velocities
 s = @at (Center, Center, Center) sqrt(u^2 + v^2)
 
 using Oceanostics: ErtelPotentialVorticity
-q = ErtelPotentialVorticity(model, model.velocities..., model.tracers.T, model.coriolis)
+using Oceananigans.BuoyancyFormulations: buoyancy
+q = Field(ErtelPotentialVorticity(model, model.velocities..., buoyancy(model), model.coriolis), boundary_conditions=ValueBoundaryCondition(0))
 outputs = merge(model.velocities, model.tracers, (; ζ, s, q))
 
 xy_writer = JLD2OutputWriter(model, outputs,
