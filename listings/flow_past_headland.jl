@@ -31,6 +31,7 @@ open_bc = PerturbationAdvectionOpenBoundaryCondition(U; inflow_timescale = 5minu
 u_bcs = FieldBoundaryConditions(east = open_bc, west = open_bc)
 
 @inline ambient_temperature(x, z, t, H) = 12 + 4z/H
+@inline ambient_temperature(x, y, z, t, H) = ambient_temperature(x, z, t, H)
 ambient_temperature_bc = ValueBoundaryCondition(ambient_temperature; parameters = H)
 T_bcs = FieldBoundaryConditions(east = ambient_temperature_bc, west = ambient_temperature_bc)
 
@@ -42,7 +43,7 @@ model = NonhydrostaticModel(; grid, tracers = (:T, :S), #forcing,
                               advection = WENO(order=9), coriolis = FPlane(latitude=47.5),
                               boundary_conditions = (; T=T_bcs, u = u_bcs, S = S_bcs))
 
-Tᵢ(x, y, z) = ambient_temperature(x, 0, z, H)
+Tᵢ(x, y, z) = ambient_temperature(x, y, z, 0, H)
 
 set!(model, T=Tᵢ, S=32, u=U(0, 0, 0, 0, (; U₂, T₂)))
 
