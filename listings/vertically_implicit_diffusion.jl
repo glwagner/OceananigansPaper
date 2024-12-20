@@ -1,9 +1,6 @@
 using Oceananigans
 using Oceananigans.TurbulenceClosures: ExplicitTimeDiscretization, VerticallyImplicitTimeDiscretization
-
 using GLMakie
-
-set_theme!(Theme(linewidth=3, linealpha=0.6))
 
 fig = Figure(size=(1000, 400))
 axκ = Axis(fig[1, 1], xlabel="Tracer diffusivity", ylabel="z")

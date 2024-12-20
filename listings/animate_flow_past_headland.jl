@@ -4,7 +4,7 @@ using Oceananigans.Units
 using CairoMakie
 using Printf
 
-Nz = 8#64
+Nz = 64
 ut = FieldTimeSeries("flow_past_headland_$(Nz)_xy.jld2", "u")
 Tt = FieldTimeSeries("flow_past_headland_$(Nz)_xy.jld2", "T")
 wt = FieldTimeSeries("flow_past_headland_$(Nz)_xy.jld2", "w")
@@ -43,7 +43,7 @@ T₂ = 12.421hours
 title = @lift @sprintf("2π t / T₂ = %1.2f", ut.times[$n] / T₂)
 text!(axu, xtxt, ytxt; text=title, space=:relative, color=:white, align=(:left, :top), fontsize=18)
 
-frames = 1:length(ut.times)
+frames = 1:4:length(ut.times)
 record(fig, "flow_past_headland_$Nz.mp4", frames, framerate=14) do i
     msg = string("Plotting frame ", i, " of ", frames[end])
     print(msg * " \r")

@@ -1,9 +1,9 @@
 using Oceananigans
 using GLMakie
 
-xyfilename = "wind_pulse_512_xy.jld2"
-yzfilename = "wind_pulse_512_yz.jld2"
-xzfilename = "wind_pulse_512_xz.jld2"
+xyfilename = "pulse_of_wind_xy.jld2"
+yzfilename = "pulse_of_wind_yz.jld2"
+xzfilename = "pulse_of_wind_xz.jld2"
 
 wxyt = FieldTimeSeries(xyfilename, "w")
 wyzt = FieldTimeSeries(yzfilename, "w")
@@ -32,45 +32,43 @@ xxy = x
 yxy = y
 zxy = z[k] * ones(Nx, Ny)
 
-fig = Figure(size = (900, 700))
+fig = Figure(size = (900, 600))
 
-ax = Axis3(fig[2:6, 1], aspect=(1, 1, 1/2),
+ax = Axis3(fig[1, 1], aspect=(1, 1, 1/2),
            xlabel = "x (m)", ylabel = "y (m)", zlabel = "z (m)",
            xlabeloffset = 100, ylabeloffset = 100, zlabeloffset = 100,
-           elevation = 0.6, azimuth = 4.1, protrusions = 40, perspectiveness = 0.7)
+           elevation = 0.4, azimuth = 4, protrusions = 40, perspectiveness = 0.7)
 
 # slider = Slider(fig[2, 1], range=1:Nt, startvalue=Nt)
 # n = slider.value
 n = Observable(1)
 
+# t = wxyt.times
+# title = @lift "Turbulence beneath a wind pulse after " * prettytime(t[$n])
+# Label(fig[1, 1], title, tellheight=false, tellwidth=false)
+# rowsize!(fig.layout, 1, Relative(0.2))
+
 wxy = @lift interior(wxyt[$n], :, :, 1)
 wyz = @lift interior(wyzt[$n], 1, :, :)
 wxz = @lift interior(wxzt[$n], :, 1, :)
 
-wlim⁻ = Ref(1e-2)
-ϵ = 0.1
-wlims = @lift begin
-    if $n % 10 == 0
-        wmax = maximum(abs, wxyt[$n])
-        wlim★ = wmax * 3/4
-        wlimⁿ = ϵ * wlim⁻[] + (1 - ϵ) * wlim★
-        wlim⁻[] = wlimⁿ 
-    else
-        wlimⁿ = wlim⁻[]
-    end
-
-    (-wlimⁿ, wlimⁿ)
-end
-
-kwargs = (colorrange=wlims, colormap=:balance)
+wlim = maximum(abs, wxyt) / 16
+kwargs = (; colormap=:balance)
+kwargs = (colorrange=(-wlim, wlim), colormap=:balance)
 surface!(ax, xyz, yyz, zyz; color = wyz, kwargs...)
 surface!(ax, xxz, yxz, zxz; color = wxz, kwargs...)
-sf = surface!(ax, xxy, yxy, zxy; color = wxy, kwargs...)
+surface!(ax, xxy, yxy, zxy; color = wxy, kwargs...)
 
-t = wxyt.times
-label = @lift string("Vertical velocity (m s⁻¹) after ", prettytime(t[$n]))
-Colorbar(fig[1, 1], sf; label, vertical=false, width=Relative(0.7))
-rowgap!(fig.layout, Relative(-0.2))
+#=
+wxy = @lift wxyt[$n]
+wyz = @lift wyzt[$n]
+wxz = @lift wxzt[$n]
+wlim = maximum(abs, wxyt) / 4
+kwargs = (colorrange=(-wlim, wlim), colormap=:balance)
+surface!(ax, wyz, :west; kwargs...)
+surface!(ax, wxz, :south; kwargs...)
+surface!(ax, wxy, :top; kwargs...)
+=#
 
 display(fig)
 

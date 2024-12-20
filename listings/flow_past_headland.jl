@@ -1,15 +1,13 @@
 using Oceananigans
 using Oceananigans.Units
 using SeawaterPolynomials: TEOS10EquationOfState
-using Oceananigans.BoundaryConditions: PerturbationAdvectionOpenBoundaryCondition
-using Oceananigans: BoundaryAdjacentMean
 
 H, L, δ = 256meters, 1024meters, 512meters
 x, y, z = (-3L, 3L), (-L, L), (-H, 0)
 Nz = 64
 
 grid = RectilinearGrid(GPU(); size=(6Nz, 2Nz, Nz), halo=(6, 6, 6),
-                       x, y, z, topology=(Bounded, Bounded, Bounded))
+                       x, y, z, topology=(Periodic, Bounded, Bounded))
 
 wedge(x, y) = -H *(1 + (y + abs(x)) / δ)
 grid = ImmersedBoundaryGrid(grid, GridFittedBottom(wedge))
@@ -18,36 +16,25 @@ grid = ImmersedBoundaryGrid(grid, GridFittedBottom(wedge))
 
 T₂ = 12.421hours
 U₂ = 0.1 # m/s
+@inline Fu(x, y, z, t, p) = 2π * p.U₂ / p.T₂ * sin(2π * t / p.T₂)
+forcing = (; u=Forcing(Fu, parameters=(; U₂, T₂)))
 
-@inline Fu(x, y, z, t, p) = 2π * p.U₂ / p.T₂ * cos(2π * t / p.T₂)
-@inline U(x, y, z, t, p) = p.U₂ * sin(2π * t / p.T₂)
-@inline U(y, z, t, p) = U(zero(y), y, z, t, p)
 
-forcing = (u = Forcing(Fu, parameters=(; U₂, T₂)), )
+Q = 250.0  # W m⁻², surface _heat_ flux
+ρₒ = 1026.0 # kg m⁻³, average density at the surface of the world ocean
+cᴾ = 3991.0 # J K⁻¹ kg⁻¹, typical heat capacity for seawater
+Jᵀ = Q / (ρₒ * cᴾ) # K m s⁻¹, surface _temperature_ flux
+surface_temperature_flux(x, y, t, p) = p.Jᵀ * (1 - exp(-t^4 / (p.time_delay^4)))
+temperature_top_bc = FluxBoundaryCondition(surface_temperature_flux, parameters = (; Jᵀ, time_delay = 1day))
+temperature_bcs = FieldBoundaryConditions(top = temperature_top_bc)
 
-open_bc = PerturbationAdvectionOpenBoundaryCondition(U; inflow_timescale = 5minutes,
-                                                        outflow_timescale = 20minutes,
-                                                        parameters=(; U₂, T₂))
+model = NonhydrostaticModel(; grid, tracers = (:T, :S), forcing,
+                            buoyancy = SeawaterBuoyancy(; equation_of_state = TEOS10EquationOfState()),
+                            advection = WENO(order=9), coriolis = FPlane(latitude=47.5),
+                            boundary_conditions = (; T=temperature_bcs))
 
-u_bcs = FieldBoundaryConditions(east = open_bc, west = open_bc)
-
-@inline ambient_temperature(x, z, t, H) = 12 + 4z/H
-
-ambient_temperature_bc = ValueBoundaryCondition(ambient_temperature; parameters = H)
-
-temperature_bcs = FieldBoundaryConditions(east = ambient_temperature_bc, west = ambient_temperature_bc)
-
-ambient_salinity_bc = ValueBoundaryCondition(32)
-
-S_bcs = FieldBoundaryConditions(east = ambient_salinity_bc, west = ambient_salinity_bc)
-
-model = NonhydrostaticModel(; grid, tracers = (:T, :S), buoyancy, forcing,
-                              advection = WENO(order=9), coriolis = FPlane(latitude=47.5),
-                              boundary_conditions = (; T=temperature_bcs, u = u_bcs, S = S_bcs))
-
-Tᵢ(x, y, z) = ambient_temperature(x, 0, z, H)
-
-set!(model, T=Tᵢ, S=32, u=U(0, 0, 0, 0, (; U₂, T₂)))
+Tᵢ(x, y, z) = 12 + 4z / H
+set!(model, T=Tᵢ, S=32, u=U₂/2)
 
 simulation = Simulation(model, Δt=5, stop_time=3days)
 conjure_time_step_wizard!(simulation, cfl=0.7)

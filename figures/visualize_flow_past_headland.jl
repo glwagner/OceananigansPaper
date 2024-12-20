@@ -1,7 +1,7 @@
 using Oceananigans
 using Oceananigans.Units
 using Oceananigans.ImmersedBoundaries: mask_immersed_field!
-using CairoMakie
+using GLMakie
 using Printf
 #using MathTeXEngine
 
@@ -10,11 +10,7 @@ Tt = FieldTimeSeries("flow_past_headland_64_xy.jld2", "T")
 Nt = length(ut)
 x, y, z = nodes(ut)
 
-T₂ = 12.421hours
-
-# times
-tp = T₂ .* (1 .+ [1/3, 2/3, 1])#2.75, 5.25]
-np = map(t -> findfirst(ut.times .>= t), tp)
+np = (30, 290, 396)
 
 # mask_immersed_field! is giving me a segfault.
 # This is a workaround.
@@ -39,17 +35,14 @@ end
 fig = Figure(size=(1100, 900))
 
 for (m, n) in enumerate(np)
-    axu = Axis(fig[m, 1], xlabel="x (m)", ylabel="y (m)", aspect = DataAspect())
-    axz = Axis(fig[m, 2], xlabel="x (m)", ylabel="y (m)", yaxisposition=:right, aspect = DataAspect())
-
-    xlims!(axu, -2000, 2000)
-    xlims!(axz, -2000, 2000)
+    axu = Axis(fig[m, 1], aspect=2, xlabel="x (m)", ylabel="y (m)")
+    axz = Axis(fig[m, 2], aspect=2, xlabel="x (m)", ylabel="y (m)", yaxisposition=:right)
 
     un = interior(ut[n], :, :, 1)
     Tn = interior(Tt[n], :, :, 1)
 
     hmu = heatmap!(axu, x, y, un, nan_color=:lightgray, colormap=:balance, colorrange=(-0.3, 0.3))
-    hmT = heatmap!(axz, x, y, Tn, nan_color=:lightgray, colormap=:magma, colorrange=(8.7, 11.4))
+    hmT = heatmap!(axz, x, y, Tn, nan_color=:lightgray, colormap=:magma, colorrange=(9.8, 11.4))
 
     if m == 1
         Colorbar(fig[0, 1], hmu, vertical=false, label="x-velocity (m s⁻¹)", width=Relative(0.9))
@@ -63,8 +56,9 @@ for (m, n) in enumerate(np)
 
     xtxt = 0.03
     ytxt = 0.97
-    t = ut.times[n]/T₂
-    label = @sprintf("t / T₂ = %.2f", t)
+    T₂ = 12.421hours
+    t = ut.times[n] * 2π/T₂
+    label = @sprintf("2π t / T₂ = %.1f", t)
     if m == 1
         color = :white
     elseif m == 2
