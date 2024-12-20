@@ -28,22 +28,19 @@ forcing = (u = Forcing(Fu, parameters=(; U₂, T₂)), )
 open_bc = PerturbationAdvectionOpenBoundaryCondition(U; inflow_timescale = 5minutes,
                                                         outflow_timescale = 20minutes,
                                                         parameters=(; U₂, T₂))
-
 u_bcs = FieldBoundaryConditions(east = open_bc, west = open_bc)
 
 @inline ambient_temperature(x, z, t, H) = 12 + 4z/H
-
 ambient_temperature_bc = ValueBoundaryCondition(ambient_temperature; parameters = H)
-
-temperature_bcs = FieldBoundaryConditions(east = ambient_temperature_bc, west = ambient_temperature_bc)
+T_bcs = FieldBoundaryConditions(east = ambient_temperature_bc, west = ambient_temperature_bc)
 
 ambient_salinity_bc = ValueBoundaryCondition(32)
-
 S_bcs = FieldBoundaryConditions(east = ambient_salinity_bc, west = ambient_salinity_bc)
 
-model = NonhydrostaticModel(; grid, tracers = (:T, :S), buoyancy, forcing,
+model = NonhydrostaticModel(; grid, tracers = (:T, :S), #forcing,
+                              buoyancy = SeawaterBuoyancy(equation_of_state=TEOS10EquationOfState()),
                               advection = WENO(order=9), coriolis = FPlane(latitude=47.5),
-                              boundary_conditions = (; T=temperature_bcs, u = u_bcs, S = S_bcs))
+                              boundary_conditions = (; T=T_bcs, u = u_bcs, S = S_bcs))
 
 Tᵢ(x, y, z) = ambient_temperature(x, 0, z, H)
 
@@ -77,7 +74,7 @@ s = @at (Center, Center, Center) sqrt(u^2 + v^2)
 
 using Oceanostics: ErtelPotentialVorticity
 using Oceananigans.BuoyancyFormulations: buoyancy
-q = Field(ErtelPotentialVorticity(model, model.velocities..., buoyancy(model), model.coriolis), boundary_conditions=ValueBoundaryCondition(0))
+q = Field(ErtelPotentialVorticity(model, model.velocities..., buoyancy(model), model.coriolis))
 outputs = merge(model.velocities, model.tracers, (; ζ, s, q))
 
 xy_writer = JLD2OutputWriter(model, outputs,
