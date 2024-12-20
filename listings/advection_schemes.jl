@@ -20,8 +20,9 @@ end
 
 using GLMakie
 
-set_theme!(Theme(fontsize=18, linewidth=2, linealpha=0.6))
-fig = Figure(size=(1000, 300))
+set_theme!(Theme(fontsize=18, linewidth=3, linealpha=0.6))
+
+fig = Figure(size=(800, 240))
 ax = Axis(fig[1, 1], xlabel="x") #, ylabel="c(t=4)")
 
 stop_time = 0.1
