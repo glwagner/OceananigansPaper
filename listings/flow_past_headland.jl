@@ -23,8 +23,6 @@ U₂ = 0.1 # m/s
 @inline U(x, y, z, t, p) = p.U₂ * sin(2π * t / p.T₂)
 @inline U(y, z, t, p) = U(zero(y), y, z, t, p)
 
-forcing = (u = Forcing(Fu, parameters=(; U₂, T₂)), )
-
 open_bc = PerturbationAdvectionOpenBoundaryCondition(U; inflow_timescale = 5minutes,
                                                         outflow_timescale = 20minutes,
                                                         parameters=(; U₂, T₂))
@@ -38,7 +36,7 @@ T_bcs = FieldBoundaryConditions(east = ambient_temperature_bc, west = ambient_te
 ambient_salinity_bc = ValueBoundaryCondition(32)
 S_bcs = FieldBoundaryConditions(east = ambient_salinity_bc, west = ambient_salinity_bc)
 
-model = NonhydrostaticModel(; grid, tracers = (:T, :S), #forcing,
+model = NonhydrostaticModel(; grid, tracers = (:T, :S),
                               buoyancy = SeawaterBuoyancy(equation_of_state=TEOS10EquationOfState()),
                               advection = WENO(order=9), coriolis = FPlane(latitude=47.5),
                               boundary_conditions = (; T=T_bcs, u = u_bcs, S = S_bcs))
@@ -47,7 +45,7 @@ Tᵢ(x, y, z) = ambient_temperature(x, y, z, 0, H)
 
 set!(model, T=Tᵢ, S=32, u=U(0, 0, 0, 0, (; U₂, T₂)))
 
-simulation = Simulation(model, Δt=5, stop_time=3days)
+simulation = Simulation(model, Δt=5, stop_time=2days)
 conjure_time_step_wizard!(simulation, cfl=0.7)
 
 using Printf
