@@ -16,9 +16,9 @@ x, y, z = nodes(qt)
 H, L, δ = 256meters, 1024meters, 512meters
 grid = qt.grid.underlying_grid
 
-xss = 2:grid.Nx-1
-yss = 2:grid.Ny-1
-zss = 2:grid.Nz-1
+xss = 1:grid.Nx
+yss = 1:grid.Ny
+zss = 1:grid.Nz
 qt = qt[xss, yss, zss, :]
 x=x[xss]
 y=y[yss]
@@ -37,15 +37,15 @@ volume!(ax, x, y, z, bathymetry, algorithm = :absorption, isorange = 50, absorpt
 
 
 colormap = to_colormap(:balance)
-PV_lim = 5e-1
+limit = 1e-8
 middle_chunk = ceil(Int, 0.4 * 128)
 colormap[128-middle_chunk:128+middle_chunk] .= RGBAf(0, 0, 0, 0)
 
 n = Observable(1)
 qₙ = @lift qt[:,:,:,$n]
-vol = volume!(ax, x, y, z, qₙ, algorithm = :absorption, absorption=20f0, colormap=colormap, colorrange=(-PV_lim, +PV_lim))
+vol = volume!(ax, x, y, z, qₙ, algorithm = :absorption, absorption=20f0, colormap=colormap, colorrange=(-limit, +limit))
 Colorbar(fig, vol, bbox=ax.scene.px_area,
-         label="PV / N²∞ f₀", height=25, width=Relative(0.35), vertical=false,
+         label="Ertel PV", height=25, width=Relative(0.35), vertical=false,
          alignmode = Outside(10), halign = 0.15, valign = 0.02)
 
 
@@ -56,5 +56,4 @@ times = ζt.times
 title = @lift @sprintf("2π t / T₂ = %1.2f", times[$n] / T₂)
 text!(ax, xtxt, ytxt; text=title, space=:relative, color=:black, align=(:left, :top), fontsize=18)
 
-frames = 1:4:length(times)
 save("3d_plot_headland.png", fig)
