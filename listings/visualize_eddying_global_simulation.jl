@@ -37,10 +37,10 @@ end
 end
 
 fig = Figure(size = (1200, 800))
-axT = Axis(fig[2, 1], title="Surface temperature ᵒC")
-axS = Axis(fig[2, 2], title="Surface salinity psu")
-axs = Axis(fig[3, 1], title="Surface speed ms⁻¹")
-axζ = Axis(fig[3, 2], title="Vertical vorticity s⁻¹")
+axT = Axis(fig[1, 2], title="Surface temperature ᵒC")
+axS = Axis(fig[1, 3], title="Surface salinity psu")
+axs = Axis(fig[2, 2], title="Surface speed ms⁻¹")
+axζ = Axis(fig[2, 3], title="Vertical vorticity s⁻¹")
 
 hmT = heatmap!(axT, Tn, colormap=:magma, colorrange=(-1, 35))
 hmS = heatmap!(axS, Sn, colormap=:haline, colorrange=(25, 35))
@@ -53,9 +53,9 @@ hidedecorations!(axs)
 hidedecorations!(axζ)
 
 Colorbar(fig[1, 1], hmT, flipaxis = false)
-Colorbar(fig[1, 2], hmS, flipaxis = false)
-Colorbar(fig[4, 1], hms, flipaxis = false)
-Colorbar(fig[4, 2], hmζ, flipaxis = false)
+Colorbar(fig[1, 4], hmS)
+Colorbar(fig[2, 1], hms, flipaxis = false)
+Colorbar(fig[2, 4], hmζ)
 
 iter[] = 120
 CairoMakie.save("eddying_near_global.png", fig)
