@@ -20,7 +20,7 @@ uf = similar(u[1])
 vf = similar(v[1])
 
 s = Field(sqrt(uf^2 + vf^2))
-ζ = Field(KernelFunctionOperation{Face, Face, Nothing}(Oceananigans.Operators.ζ₃ᶠᶠᶜ, grid.underlying_grid, uf, vf))
+ζ = Field(KernelFunctionOperation{Face, Face, Nothing}(Oceananigans.Operators.ζ₃ᶠᶠᶜ, uf.grid.underlying_grid, uf, vf))
 
 sn = @lift begin
     set!(uf, $un)
@@ -57,9 +57,11 @@ Colorbar(fig[0, 2], hmS, vertical=false, label="Surface salinity psu")
 Colorbar(fig[3, 1], hms, vertical=false, label="Surface speed ms⁻¹")
 Colorbar(fig[3, 2], hmζ, vertical=false, label="Vertical vorticity s⁻¹")
 
-CarioMakie.record(fig, "eddying_near_global.mp4", 1:Nt, framerate=8) do i
+iter[] = 120
+CairoMakie.save("eddying_near_global.png", fig)
+
+CairoMakie.record(fig, "eddying_near_global.mp4", 1:Nt, framerate=8) do i
     @info "Printing $i of $Nt"
     iter[] = i
 end
 
-CairoMakie.save("eddying_near_global.png", fig)
