@@ -2,7 +2,6 @@ using Oceananigans
 using Oceananigans.Units
 using SeawaterPolynomials: TEOS10EquationOfState
 using Oceananigans.BoundaryConditions: PerturbationAdvectionOpenBoundaryCondition
-using Oceananigans: BoundaryAdjacentMean
 
 H, L, δ = 256meters, 1024meters, 512meters
 x, y, z = (-3L, 3L), (-L, L), (-H, 0)
@@ -23,9 +22,10 @@ U₂ = 0.1 # m/s
 @inline U(x, y, z, t, p) = p.U₂ * sin(2π * t / p.T₂)
 @inline U(y, z, t, p) = U(zero(y), y, z, t, p)
 
-open_bc = PerturbationAdvectionOpenBoundaryCondition(U; inflow_timescale = 5minutes,
-                                                        outflow_timescale = 20minutes,
+open_bc = PerturbationAdvectionOpenBoundaryCondition(U; inflow_timescale = 2minutes,
+                                                        outflow_timescale = 2minutes,
                                                         parameters=(; U₂, T₂))
+
 u_bcs = FieldBoundaryConditions(east = open_bc, west = open_bc)
 
 @inline ambient_temperature(x, z, t, H) = 12 + 4z/H
@@ -74,7 +74,7 @@ s = @at (Center, Center, Center) sqrt(u^2 + v^2)
 using Oceanostics: ErtelPotentialVorticity
 using Oceananigans.BuoyancyFormulations: buoyancy
 q = Field(ErtelPotentialVorticity(model, model.velocities..., buoyancy(model), model.coriolis))
-outputs = merge(model.velocities, model.tracers, (; ζ, s, q))
+outputs = merge(model.velocities, model.tracers, (; ζ,))# s))#, q))
 
 xy_writer = JLD2OutputWriter(model, outputs,
                              indices = (:, :, grid.Nz),
@@ -87,6 +87,7 @@ xz_writer = JLD2OutputWriter(model, outputs,
                              schedule = TimeInterval(10minutes),
                              filename = prefix * "_xz.jld2",
                              overwrite_existing = true)
+
 xyz_writer = JLD2OutputWriter(model, outputs,
                               schedule = TimeInterval(6hours),
                               filename = prefix * "_xyz.jld2",
