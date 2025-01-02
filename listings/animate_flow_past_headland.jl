@@ -14,7 +14,7 @@ x, y, z = nodes(ut)
 
 Nz_top = ut.grid.underlying_grid.Nz
 
-fig = Figure(size=(1100, 600))
+fig = Figure()
 n = Observable(1)
 
 un = @lift interior(ut[$n], :, :, 1)
@@ -44,6 +44,7 @@ title = @lift @sprintf("2π t / T₂ = %1.2f", ut.times[$n] / T₂)
 text!(axu, xtxt, ytxt; text=title, space=:relative, color=:white, align=(:left, :top), fontsize=18)
 
 frames = 1:2:length(ut.times)
+resize_to_layout!(fig)
 record(fig, "flow_past_headland_$Nz.mp4", frames, framerate=14) do i
     msg = string("Plotting frame ", i, " of ", frames[end])
     print(msg * " \r")
