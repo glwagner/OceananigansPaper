@@ -57,7 +57,7 @@ function progress(sim)
     u, v, w = sim.model.velocities
     ΔT = 1e-9 * (time_ns() - wallclock[])
     ΔT₀ = 1e-9 * (time_ns() - T₀)
-    msg = @sprintf("(%d) t: %s, Δt: %s, wall time / time step: %s, total wall time : %s",
+    msg = @sprintf("(%d) t: %s, Δt: %s, wall time since last print: %s, total wall time : %s",
                    iteration(sim), prettytime(sim), prettytime(sim.Δt), prettytime(ΔT), prettytime(ΔT₀))
     @info msg
     wallclock[] = time_ns()

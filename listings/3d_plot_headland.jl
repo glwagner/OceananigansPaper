@@ -16,7 +16,7 @@ x, y, z = nodes(qt)
 H, L, δ = 256meters, 1024meters, 512meters
 grid = qt.grid.underlying_grid
 
-xss = 1:grid.Nx
+xss = 2:grid.Nx
 yss = 1:grid.Ny
 zss = 1:grid.Nz
 qt = qt[xss, yss, zss, :]
@@ -37,7 +37,7 @@ volume!(ax, x, y, z, bathymetry, algorithm = :absorption, isorange = 50, absorpt
 
 
 colormap = to_colormap(:balance)
-limit = 1e-8
+limit = 5e-8
 middle_chunk = ceil(Int, 0.4 * 128)
 colormap[128-middle_chunk:128+middle_chunk] .= RGBAf(0, 0, 0, 0)
 
