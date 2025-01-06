@@ -69,12 +69,13 @@ add_callback!(simulation, progress, IterationInterval(100))
 prefix = "flow_past_headland_$Nz"
 u, v, w = model.velocities
 ζ = ∂x(v) - ∂y(u)
-s = @at (Center, Center, Center) sqrt(u^2 + v^2)
 
-using Oceanostics: ErtelPotentialVorticity
+using Oceanostics: ErtelPotentialVorticity, RichardsonNumber
 using Oceananigans.BuoyancyFormulations: buoyancy
+
 q = Field(ErtelPotentialVorticity(model, model.velocities..., buoyancy(model), model.coriolis))
-outputs = merge(model.velocities, model.tracers, (; ζ,))# s))#, q))
+Ri = RichardsonNumber(model)
+outputs = merge(model.velocities, model.tracers, (; ζ, q, Ri))
 
 xy_writer = JLD2OutputWriter(model, outputs,
                              indices = (:, :, grid.Nz),

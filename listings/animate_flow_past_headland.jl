@@ -14,7 +14,7 @@ x, y, z = nodes(ut)
 
 Nz_top = ut.grid.underlying_grid.Nz
 
-fig = Figure()
+fig = Figure(size=(1100, 800))
 n = Observable(1)
 
 un = @lift interior(ut[$n], :, :, 1)
