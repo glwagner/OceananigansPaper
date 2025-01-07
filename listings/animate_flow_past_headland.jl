@@ -12,8 +12,6 @@ wt = FieldTimeSeries("flow_past_headland_$(Nz)_xy.jld2", "w")
 Nt = length(ut)
 x, y, z = nodes(ut)
 
-Nz_top = ut.grid.underlying_grid.Nz
-
 fig = Figure(size=(1100, 800))
 n = Observable(1)
 

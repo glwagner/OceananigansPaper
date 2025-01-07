@@ -1,75 +1,76 @@
 using Oceananigans
 using Oceananigans.Units
-using Oceananigans.ImmersedBoundaries: mask_immersed_field!
 using GLMakie
 using Printf
-#using MathTeXEngine
 
-ut = FieldTimeSeries("flow_past_headland_64_xy.jld2", "u")
-Tt = FieldTimeSeries("flow_past_headland_64_xy.jld2", "T")
-Nt = length(ut)
-x, y, z = nodes(ut)
+Nz = 64
+ut = FieldTimeSeries("flow_past_headland_$(Nz)_xy.jld2", "u")
+Tt = FieldTimeSeries("flow_past_headland_$(Nz)_xy.jld2", "T")
+qt = FieldTimeSeries("flow_past_headland_$(Nz)_xyz.jld2", "q")
 
-np = (30, 290, 396)
+Nq = 5 # Time index for 3D PV plot
+time = qt.times[Nq]
 
-# mask_immersed_field! is giving me a segfault.
-# This is a workaround.
-Nx, Ny, Nz, Nt = size(ut)
-Nz_top = ut.grid.underlying_grid.Nz
-for n in np
-    @inbounds for i = 1:Nx, j=1:Ny
-        if ut[i, j, Nz_top, n] == 0
-            ut[i, j, Nz_top, n] = NaN
-        end
+Nu = findmin(abs.(ut.times.-time))[2] # Find corresponding time index for 2D plots
 
-        if Tt[i, j, Nz_top, n] == 0
-            Tt[i, j, Nz_top, n] = NaN
-        end
-    end
+fig = Figure(size=(1100, 800))
 
-    # We shouldn't have to do this manually either
-    # mask_immersed_field!(ut[n], NaN)
-    # mask_immersed_field!(Tt[n], NaN)
-end
+xu, yu, zu = nodes(ut)
+un = interior(ut[Nu], :, :, 1)
+axu = Axis(fig[1, 1], aspect=DataAspect(), xlabel="x (m)", ylabel="y (m)", width=500)
+hmu = heatmap!(axu, xu, yu, un, nan_color=:lightgray, colormap=:balance, colorrange=(-0.3, 0.3))
+Colorbar(fig[0, 1], hmu, vertical=false, label="x-velocity (m s⁻¹)", width=Relative(0.5))
 
-fig = Figure(size=(1100, 900))
+xT, yT, zT = nodes(Tt)
+Tn = interior(Tt[Nu], :, :, 1)
+axT = Axis(fig[1, 2], aspect=DataAspect(), xlabel="x (m)", ylabel="y (m)", width=500)
+hmT = heatmap!(axT, xT, yT, Tn, nan_color=:lightgray, colormap=:magma, colorrange=(9.8, 11.4))
+Colorbar(fig[0, 2], hmT, vertical=false, label="Temperature (ᵒC)", width=250, height=15)
 
-for (m, n) in enumerate(np)
-    axu = Axis(fig[m, 1], aspect=2, xlabel="x (m)", ylabel="y (m)")
-    axz = Axis(fig[m, 2], aspect=2, xlabel="x (m)", ylabel="y (m)", yaxisposition=:right)
+H, L, δ = 256meters, 1024meters, 512meters
+Nx, Ny, Nz = size(qt.grid)
 
-    un = interior(ut[n], :, :, 1)
-    Tn = interior(Tt[n], :, :, 1)
+# Exclude edges
+xss = 2:Nx
+yss = 2:Ny
+zss = 2:Nz
 
-    hmu = heatmap!(axu, x, y, un, nan_color=:lightgray, colormap=:balance, colorrange=(-0.3, 0.3))
-    hmT = heatmap!(axz, x, y, Tn, nan_color=:lightgray, colormap=:magma, colorrange=(9.8, 11.4))
+xq, yq, zq = nodes(qt)
+qt = qt[xss, yss, zss, :]
+xq = xq[xss]
+yq = yq[yss]
+zq = zq[zss]
 
-    if m == 1
-        Colorbar(fig[0, 1], hmu, vertical=false, label="x-velocity (m s⁻¹)", width=Relative(0.9))
-        Colorbar(fig[0, 2], hmT, vertical=false, label="Temperature (ᵒC)", width=Relative(0.9))
-    end
+# Create bathymetry map
+wedge(x, y) = -H *(1 + (y + abs(x)) / δ)
+bathymetry = [ wedge(x, y) > z ? 1 : 0 for x=xq, y=yq, z=zq ]
 
-    if m < 3
-        hidexdecorations!(axu)
-        hidexdecorations!(axz)
-    end
+ax = Axis3(fig[2, 1:2]; aspect = (ut.grid.Lx, ut.grid.Ly, 4*ut.grid.Lz), width = 1000, height=400, azimuth = 0.6π, elevation = 0.15π,
+                        perspectiveness=0.8, viewmode=:fitzoom,
+                        xlabel="x [m]", ylabel="y [m]", zlabel="z [m]")
 
-    xtxt = 0.03
-    ytxt = 0.97
-    T₂ = 12.421hours
-    t = ut.times[n] * 2π/T₂
-    label = @sprintf("2π t / T₂ = %.1f", t)
-    if m == 1
-        color = :white
-    elseif m == 2
-        color = :black
-    elseif m == 3
-        color = :black
-    end
-    text!(axu, xtxt, ytxt; text=label, space=:relative, color, align=(:left, :top), fontsize=18)
-end
+# Plot bathymetry
+volume!(ax, xq, yq, zq, bathymetry, algorithm = :absorption, isorange = 50, absorption=50f0, colormap = [RGBAf(0,0,0,0), :papayawhip], colorrange=(0, 1))
 
-display(fig)
+# adjust colormap
+colormap = to_colormap(:balance)
+lc = length(colormap)÷2
+middle_chunk = ceil(Int, 0.4 * lc)
+colormap[lc-middle_chunk:lc+middle_chunk] .= RGBAf(0, 0, 0, 0) # Make middle chunk trasparent
 
-save("flow_past_headland.png", fig)
+qₙ = qt[:, :, :, Nq]
+limit = 5e-8
+vol = volume!(ax, xq, yq, zq, qₙ, algorithm = :absorption, absorption=20f0, colormap=colormap, colorrange=(-limit, +limit))
+Colorbar(fig, vol, bbox=ax.scene.px_area,
+         label="Ertel Potential Vorticity (1/s³)", height=15, width=250, vertical=false,
+         alignmode = Outside(10), halign = -0.1, valign = 0.02)
+
+xtxt = 0.03
+ytxt = 0.97
+T₂ = 12.421hours
+title = @sprintf("2π t / T₂ = %1.2f", time / T₂)
+text!(axu, xtxt, ytxt; text=title, space=:relative, color=:black, align=(:left, :top), fontsize=18)
+
+resize_to_layout!(fig)
+save("3d_plot_headland_$Nz.png", fig)
 

@@ -2,6 +2,8 @@ using Oceananigans
 using Oceananigans.Units
 using SeawaterPolynomials: TEOS10EquationOfState
 using Oceananigans.BoundaryConditions: PerturbationAdvectionOpenBoundaryCondition
+using Oceanostics: ErtelPotentialVorticity
+using Oceananigans.BuoyancyFormulations: buoyancy
 
 H, L, δ = 256meters, 1024meters, 512meters
 x, y, z = (-3L, 3L), (-L, L), (-H, 0)
@@ -70,12 +72,8 @@ prefix = "flow_past_headland_$Nz"
 u, v, w = model.velocities
 ζ = ∂x(v) - ∂y(u)
 
-using Oceanostics: ErtelPotentialVorticity, RichardsonNumber
-using Oceananigans.BuoyancyFormulations: buoyancy
-
 q = Field(ErtelPotentialVorticity(model, model.velocities..., buoyancy(model), model.coriolis))
-Ri = RichardsonNumber(model)
-outputs = merge(model.velocities, model.tracers, (; ζ, q, Ri))
+outputs = merge(model.velocities, model.tracers, (; ζ, q))
 
 xy_writer = JLD2OutputWriter(model, outputs,
                              indices = (:, :, grid.Nz),
