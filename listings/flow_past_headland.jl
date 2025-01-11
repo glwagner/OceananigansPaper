@@ -2,10 +2,9 @@ using Oceananigans
 using Oceananigans.Units
 using SeawaterPolynomials: TEOS10EquationOfState
 using Oceananigans.BoundaryConditions: PerturbationAdvectionOpenBoundaryCondition
-using Oceanostics: ErtelPotentialVorticity
-using Oceananigans.BuoyancyFormulations: buoyancy
 
-H, L, δ = 256meters, 1024meters, 512meters
+H, L = 256meters, 1024meters
+δ = L / 2
 x, y, z = (-3L, 3L), (-L, L), (-H, 0)
 Nz = 64
 
@@ -14,8 +13,6 @@ grid = RectilinearGrid(GPU(); size=(6Nz, 2Nz, Nz), halo=(6, 6, 6),
 
 wedge(x, y) = -H *(1 + (y + abs(x)) / δ)
 grid = ImmersedBoundaryGrid(grid, GridFittedBottom(wedge))
-
-@show grid
 
 T₂ = 12.421hours
 U₂ = 0.1 # m/s
@@ -72,6 +69,8 @@ prefix = "flow_past_headland_$Nz"
 u, v, w = model.velocities
 ζ = ∂x(v) - ∂y(u)
 
+using Oceanostics: ErtelPotentialVorticity
+using Oceananigans.BuoyancyFormulations: buoyancy
 q = Field(ErtelPotentialVorticity(model, model.velocities..., buoyancy(model), model.coriolis))
 outputs = merge(model.velocities, model.tracers, (; ζ, q))
 
