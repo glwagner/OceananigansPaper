@@ -16,7 +16,7 @@ function parse_commandline()
         "--Re"
             help = "Reynolds number"
             arg_type = Float64
-            default = 1000
+            default = 5600
         "--alpha"
             help = "Slope parameter of hill"
             arg_type = Float64
@@ -196,7 +196,7 @@ model = NonhydrostaticModel(; grid, velocities, pressure_solver, closure,
 @show model
 
 simulation = Simulation(model; Δt, stop_time)
-conjure_time_step_wizard!(simulation, cfl=0.7, IterationInterval(3); max_Δt, max_change=1.05)
+conjure_time_step_wizard!(simulation, cfl=0.5, IterationInterval(1); max_Δt, max_change=1.05)
 
 wall_time = Ref(time_ns())
 
@@ -228,7 +228,7 @@ function progress(sim)
     return nothing
 end
 
-add_callback!(simulation, progress, IterationInterval(100))
+add_callback!(simulation, progress, IterationInterval(1))
 
 function compute_bulk_statistics(sim)
     compute!(sim.model.auxiliary_fields.U_current)
