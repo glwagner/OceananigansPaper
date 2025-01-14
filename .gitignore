@@ -22,12 +22,15 @@ docs/site/
 # committed for packages, but should be committed for applications that require a static
 # environment.
 Manifest.toml
+LocalPreferences.toml
 
 *.pdf
 *.png
-*.jld2
+*.jld2*
 *.nc
 *.mp4
 *.swp
 *.jpeg
 *.DS_Store
+*.txt
+core.*

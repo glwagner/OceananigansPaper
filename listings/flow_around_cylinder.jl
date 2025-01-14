@@ -16,7 +16,7 @@ config = :les
 u∞ = 1
 r = 1/2
 arch = GPU()
-stop_time = 100
+stop_time = 200
 
 for Re in [100]
     if config == :dns
@@ -37,7 +37,7 @@ for Re in [100]
             Nx = 2Ny
         end
     else
-        Ny = 256
+        Ny = 2048
         Nx = 3Ny
         Re = Inf
     end
@@ -87,7 +87,7 @@ for Re in [100]
     ddp = DiagonallyDominantPreconditioner()
     preconditioner = FFTBasedPoissonSolver(reduced_precision_grid)
     reltol = abstol = 1e-7
-    pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=100;
+    pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=10;
                                                      reltol, abstol, preconditioner)
 
     #pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=100)

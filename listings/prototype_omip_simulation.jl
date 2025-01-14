@@ -10,14 +10,16 @@ using Printf
 using CFTime
 using Dates
 
-resolution = 1/6 # degree
+resolution = 1/8 # degree
 Nx = round(Int, 360 / resolution)
 Ny = round(Int, 170 / resolution)
-Nz = 10
-Δt = 2minutes
-stop_time = 10days
+Nz = 60
+Δt = 5minutes
+stop_time = 180days
 z_faces = exponential_z_faces(; Nz, depth=6000)
-arch = GPU() #Distributed(GPU(), partition = Partition(2))
+partition = Partition(y=4)
+arch = Distributed(GPU(); partition)
+@show prefix = string("prototype_omip_simulation_", arch.local_rank)
 
 grid = TripolarGrid(arch; 
                     size = (Nx, Ny, Nz), 
@@ -30,7 +32,7 @@ bottom_height = retrieve_bathymetry(grid;
                                     minimum_depth = 10,
                                     interpolation_passes = 2,
                                     major_basins = 1)
- 
+#= 
 grid = ImmersedBoundaryGrid(grid, GridFittedBottom(bottom_height); active_cells_map=true) 
 free_surface = SplitExplicitFreeSurface(grid; cfl=0.7, fixed_Δt=Δt)
 
@@ -63,8 +65,10 @@ FS = ECCO_restoring_forcing(salinity;    mask=restoring_mask_field, grid, archit
 forcing = (; T=FT, S=FS, u=Fu, v=Fv)
 
 # New advection scheme
-tracer_advection = WENO(order=5)
-momentum_advection = WENOVectorInvariant(vorticity_order=5)
+tracer_advection = WENO(order=7)
+momentum_advection = WENOVectorInvariant(vorticity_scheme=WENO(order=7),
+                                         divergence_scheme=WENO(order=5),
+                                         vertical_scheme=Centered(order=2))
 
 ocean = ocean_simulation(grid; forcing, tracer_advection, free_surface, momentum_advection) 
 
@@ -77,11 +81,8 @@ coupled_model = OceanSeaIceModel(ocean, sea_ice; atmosphere, radiation)
 @info "Set up coupled model:"
 @info coupled_model
 
-coupled_simulation = Simulation(coupled_model; Δt, stop_time)
+coupled_simulation = Simulation(coupled_model; Δt, stop_time=10days)
 
-prefix = "prototype_omip_simulation"
-
-#=
 fluxes = (u = ocean.model.velocities.u.boundary_conditions.top.condition,
           v = ocean.model.velocities.v.boundary_conditions.top.condition,
           T = ocean.model.tracers.T.boundary_conditions.top.condition,
@@ -93,19 +94,18 @@ ocean.output_writers[:fluxes] = JLD2OutputWriter(ocean.model, fluxes,
                                                  overwrite_existing = true,
                                                  array_type = Array{Float32},
                                                  filename = prefix * "surface_fluxes")
-=#
 
-outputs = merge(ocean.model.tracers, ocean.model.velocities)
+κc = ocean.model.diffusivity_fields.κc
+outputs = merge(ocean.model.tracers, ocean.model.velocities, (; κc))
 
 ocean.output_writers[:surface] = JLD2OutputWriter(ocean.model, outputs, 
-                                                  schedule = TimeInterval(1days),
+                                                  schedule = TimeInterval(6hours),
                                                   with_halos = true,
                                                   overwrite_existing = true,
                                                   array_type = Array{Float32},
                                                   filename = prefix * "_surface",
                                                   indices = (:, :, grid.Nz))
 
-#=
 ocean.output_writers[:snapshots] = JLD2OutputWriter(ocean.model, merge(ocean.model.tracers, ocean.model.velocities),
                                                     schedule = TimeInterval(10days),
                                                     with_halos = true,
@@ -117,7 +117,6 @@ ocean.output_writers[:checkpoint] = Checkpointer(ocean.model,
                                                  schedule = TimeInterval(60days),
                                                  overwrite_existing = true,
                                                  prefix = prefix * "checkpoint")
-=#
 
 @info "Built an ocean simulation with the model:"
 @info ocean.model
@@ -165,8 +164,9 @@ run!(coupled_simulation)
 #coupled_simulation.Δt = 5minutes
 #
 ## Let's reset the maximum number of iterations
-#coupled_simulation.stop_time = 7200days
+#coupled_simulation.stop_time = stop_time
 #coupled_simulation.stop_iteration = Inf
 #
 #run!(coupled_simulation)
 
+=#
