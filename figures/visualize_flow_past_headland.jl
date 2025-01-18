@@ -63,8 +63,7 @@ title = @sprintf("t / T₂ = %1.2f", Tt.times[Nt] / T₂)
 text!(ax1, 0.03, 0.7; text=title, space=:relative, color=:black, align=(:left, :top), fontsize=18)
 
 plt = volumeslices!(ax1, xc[xrange_T], yc, zc, Tt_plt, colormap = Reverse(:roma), colorrange = (7.5, 12), bbox_visible = false, nan_color=:transparent)
-Colorbar(fig, plt, bbox=ax1.scene.px_area,
-         label="Temperature (°C)"; cbar_kwargs...)
+Colorbar(fig, plt, bbox=ax1.scene.px_area, label="Temperature (°C)"; cbar_kwargs...)
 
 plt[:update_xy][](grid.Nz-1)
 plt[:update_xz][](grid.Ny-1)
