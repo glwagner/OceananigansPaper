@@ -87,7 +87,7 @@ xz_writer = JLD2OutputWriter(model, outputs,
                              overwrite_existing = true)
 
 xyz_writer = JLD2OutputWriter(model, outputs,
-                              schedule = TimeInterval(6hours),
+                              schedule = TimeInterval(3hours),
                               filename = prefix * "_xyz.jld2",
                               overwrite_existing = true)
 
