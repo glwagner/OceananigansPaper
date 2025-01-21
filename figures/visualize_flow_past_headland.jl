@@ -1,89 +1,138 @@
 using Oceananigans
+using Oceananigans.Fields: location
 using Oceananigans.Units
+using Oceananigans.ImmersedBoundaries: mask_immersed_field!
 using GLMakie
 using Printf
 
 Nz = 64
+ut = FieldTimeSeries("flow_past_headland_$(Nz)_xyz.jld2", "u")
 Tt = FieldTimeSeries("flow_past_headland_$(Nz)_xyz.jld2", "T")
 qt = FieldTimeSeries("flow_past_headland_$(Nz)_xyz.jld2", "q")
 
-[Oceananigans.ImmersedBoundaries.mask_immersed_field!(Tt[n], Tt.grid, Oceananigans.Fields.location(Tt), NaN) for n in 1:length(Tt.times)]
+grid = ut.grid
 
-Nq = 5 # Time index for 3D PV plot
-time = qt.times[Nq]
+H, L = 256meters, 1024meters
+δ = L / 2
+x, y, z = (-3L, 3L), (-L, L), (-H, 0)
+Nz = 64
 
-Nu = findmin(abs.(ut.times.-time))[2] # Find corresponding time index for 2D plots
+grid = RectilinearGrid(GPU(); size=(6Nz, 2Nz, Nz), halo=(6, 6, 6),
+                       x, y, z, topology=(Bounded, Bounded, Bounded))
 
-fig = Figure(size=(1200, 800))
+xq, yq, zq = nodes(grid, Center(), Center(), Center())
 
-
-H, L, δ = 256meters, 1024meters, 512meters
-Nx, Ny, Nz = size(qt.grid)
-
-# Get nodes and fields excluding edges
-xss = 2:Nx
-yss = 2:Ny
-zss = 2:Nz
-
-xT, yT, zT = nodes(Tt)
-Tt = Tt[Nx÷2:Nx, yss, zss, :]
-xT = xT[Nx÷2:Nx]
-yT = yT[yss]
-zT = zT[zss]
-
-xq, yq, zq = nodes(qt)
-qt = qt[xss, yss, zss, :]
-xq = xq[xss]
-yq = yq[yss]
-zq = zq[zss]
-
+H, L = 256meters, 1024meters
+δ = L / 2
 
 # Create bathymetry map
 wedge(x, y) = -H *(1 + (y + abs(x)) / δ)
 bathymetry = [ wedge(x, y) > z ? 1 : 0 for x=xq, y=yq, z=zq ]
 
-axis_kwargs = (aspect = (ut.grid.Lx, ut.grid.Ly, 2*ut.grid.Lz), width = 1000, height=400, azimuth = 0.6π, elevation = 0.15π,
-               perspectiveness=0.8, viewmode=:fitzoom,
-               xlabel="x [m]", ylabel="y [m]", zlabel="z [m]")
+Nt = Observable(154)
 
-ax = Axis3(fig[1, 1:2]; axis_kwargs...)
+[mask_immersed_field!(ut[n], NaN) for n in 1:length(ut.times)]
+[mask_immersed_field!(Tt[n], NaN) for n in 1:length(ut.times)]
 
-volume!(ax, xq, yq, zq, bathymetry, algorithm = :absorption, isorange = 50, absorption=50f0, colormap = [RGBAf(0,0,0,0), :papayawhip], colorrange=(0, 1))
+ut_plt = @lift interior(ut[$Nt], 1:200, :, :)
+Tt_plt = @lift interior(Tt[$Nt], 1:200, :, :)
 
-Tₙ = Tt[:, :, :, Nq]
-plt = volumeslices!(ax, xT, yT, zT, Tₙ, colormap = Reverse(:roma), colorrange = (8, 12), bbox_visible = false)
-Colorbar(fig, plt, bbox=ax.scene.px_area,
-         label="Temperature (°C)", height=15, width=250, vertical=false,
-         alignmode = Outside(10), halign = -0.1, valign = 0.02)
+azimuth = -1.7π
+elevation = 0.1π
+perspectiveness = 0.8
 
-plt[:update_xy][](Nz-1)
-plt[:update_xz][](Ny-1)
-plt[:update_yz][](1)
+fig = Figure(size=(1200, 800))
 
+# T
+ax = Axis3(fig[1, 1]; 
+           aspect = (2, 1, 0.125), width = 1200, height=400, azimuth, elevation,
+           perspectiveness, viewmode=:fitzoom, titlegap = 0,
+           xlabel="x [m]", ylabel="y [m]", zlabel="z [m]")
+xtxt = 0.03
+ytxt = 0.7
+T₂ = 12.421hours
+title = @lift @sprintf("t / T₂ = %1.2f", Tt.times[$Nt] / T₂)
 
-ax = Axis3(fig[2, 1:2]; axis_kwargs...)
+#text!(ax, xtxt, ytxt; text=title, space=:relative, color=:black, align=(:left, :top), fontsize=18)
 
-volume!(ax, xq, yq, zq, bathymetry, algorithm = :absorption, isorange = 50, absorption=50f0, colormap = [RGBAf(0,0,0,0), :papayawhip], colorrange=(0, 1))
+# Plot bathymetry
+volume!(ax, (-3072, 3072), (-1024, 1024), (-256, 0), bathymetry, algorithm = :absorption, isorange = 50, absorption=50f0, colormap = [:papayawhip, RGBAf(0,0,0,0), :papayawhip], colorrange=(-1, 1))
 
 # adjust colormap
+
+u_slices = volumeslices!(xq[1:200], yq, zq, ut_plt, colormap = Reverse(:vik), colorrange = (-0.25, 0.25), bbox_color = :transparent)
+
+u_slices[:update_yz][](200)
+u_slices[:update_xy][](grid.Nz)
+u_slices[:update_xz][](grid.Ny)
+
+xlims!(ax, -3072, 1496)
+ylims!(ax, -1024, 1024)
+zlims!(ax, -256, 0)
+
+Colorbar(fig, u_slices, bbox=ax.scene.viewport,
+         label="x-velocity (m/s)", height = 250, width = 15, vertical = true, halign = 0.95,
+         ticks = [-0.2, -0.1, 0, 0.1, 0.2])
+
+xq, yq, zq = nodes(Tt)
+
+# T
+ax = Axis3(fig[2, 1]; 
+           aspect = (2, 1, 0.125), width = 1200, height=400, azimuth, elevation,
+           perspectiveness, viewmode=:fitzoom, titlegap = 0,
+           xlabel="x [m]", ylabel="y [m]", zlabel="z [m]")
+
+# Plot bathymetry
+volume!(ax, (-3072, 3072), (-1024, 1024), (-256, 0), bathymetry, algorithm = :absorption, isorange = 50, absorption=50f0, colormap = [:papayawhip, RGBAf(0,0,0,0), :papayawhip], colorrange=(-1, 1))
+
+# adjust colormap
+
+T_slices = volumeslices!(xq[1:200], yq, zq, Tt_plt, colormap = :lajolla, colorrange = (8.75, 12), bbox_color = :transparent)
+
+T_slices[:update_yz][](200)
+T_slices[:update_xy][](grid.Nz)
+T_slices[:update_xz][](grid.Ny)
+
+
+xlims!(ax, -3072, 1496)
+ylims!(ax, -1024, 1024)
+zlims!(ax, -256, 0)
+
+Colorbar(fig, T_slices, bbox=ax.scene.viewport,
+         label="Temperature (°C)", height = 250, width = 15, vertical = true, halign = 0.95,
+         ticks = [8, 9, 10, 11, 12])
+
+# PV
+ax = Axis3(fig[3, 1]; 
+           aspect = (2, 1, 0.125), width = 1200, height=400, azimuth, elevation,
+           perspectiveness, viewmode=:fitzoom, titlegap = 0,
+           xlabel="x [m]", ylabel="y [m]", zlabel="z [m]")
+
+# Plot bathymetry
+volume!(ax, (-3072, 3072), (-1024, 1024), (-256, 0), bathymetry, algorithm = :absorption, isorange = 50, absorption=50f0, colormap = [:papayawhip, RGBAf(0,0,0,0), :papayawhip], colorrange=(-1, 1))
+
+# adjust colormap
+
 colormap = to_colormap(:balance)
 lc = length(colormap)÷2
 middle_chunk = ceil(Int, 0.4 * lc)
 colormap[lc-middle_chunk:lc+middle_chunk] .= RGBAf(0, 0, 0, 0) # Make middle chunk trasparent
 
-qₙ = qt[:, :, :, Nq]
+qₙ = @lift interior(qt[$Nt], 2:286, 2:grid.Ny-1, 2:grid.Nz-1)
 limit = 5e-8
-vol = volume!(ax, xq, yq, zq, qₙ, algorithm = :absorption, absorption=20f0, colormap=colormap, colorrange=(-limit, +limit))
-Colorbar(fig, vol, bbox=ax.scene.px_area,
-         label="Ertel Potential Vorticity (1/s³)", height=15, width=250, vertical=false,
-         alignmode = Outside(10), halign = -0.1, valign = 0.02)
 
-xtxt = 0.03
-ytxt = 0.97
-T₂ = 12.421hours
-title = @sprintf("2π t / T₂ = %1.2f", time / T₂)
-text!(axu, xtxt, ytxt; text=title, space=:relative, color=:black, align=(:left, :top), fontsize=18)
+vol = volume!(ax, (-3056, 1496), (-1008, 1008), (-252, -4), qₙ, algorithm = :absorption, absorption=20f0, colormap=colormap, colorrange=(-limit, +limit))
 
+Colorbar(fig, vol, bbox=ax.scene.viewport,
+         label="Ertel Potential Vorticity (1/s³)", height=250, width=15, vertical=true,
+         halign = 0.95)
+
+xlims!(ax, -3072, 1496)
+ylims!(ax, -1024, 1024)
+zlims!(ax, -256, 0)
+
+rowgap!(fig.layout, Fixed(-100))
 resize_to_layout!(fig)
-save("3d_plot_headland_$Nz.png", fig)
+save("3d_plot_headland_$(Nz)_uTq.png", fig, px_per_unit = 3)
+
 
