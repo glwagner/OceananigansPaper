@@ -9,6 +9,7 @@ Nz = 64
 ut = FieldTimeSeries("flow_past_headland_$(Nz)_xyz.jld2", "u")
 Tt = FieldTimeSeries("flow_past_headland_$(Nz)_xyz.jld2", "T")
 qt = FieldTimeSeries("flow_past_headland_$(Nz)_xyz.jld2", "q")
+ut = FieldTimeSeries("flow_past_headland_$(Nz)_xyz.jld2", "u")
 
 grid = ut.grid
 
@@ -27,7 +28,7 @@ H, L = 256meters, 1024meters
 
 # Create bathymetry map
 wedge(x, y) = -H *(1 + (y + abs(x)) / δ)
-bathymetry = [ wedge(x, y) > z ? 1 : 0 for x=xq, y=yq, z=zq ]
+bathymetry = [ wedge(x, y) > z ? 1 : 0 for x=xc, y=yc, z=zc ]
 
 Nt = Observable(154)
 
@@ -134,5 +135,3 @@ zlims!(ax, -256, 0)
 rowgap!(fig.layout, Fixed(-100))
 resize_to_layout!(fig)
 save("3d_plot_headland_$(Nz)_uTq.png", fig, px_per_unit = 3)
-
-
