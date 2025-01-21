@@ -44,7 +44,7 @@ Tᵢ(x, y, z) = ambient_temperature(x, y, z, 0, H)
 
 set!(model, T=Tᵢ, S=32, u=U(0, 0, 0, 0, (; U₂, T₂)))
 
-simulation = Simulation(model, Δt=5, stop_time=2days)
+simulation = Simulation(model, Δt=5, stop_time=3days)
 conjure_time_step_wizard!(simulation, cfl=0.7)
 
 using Printf
@@ -87,7 +87,7 @@ xz_writer = JLD2OutputWriter(model, outputs,
                              overwrite_existing = true)
 
 xyz_writer = JLD2OutputWriter(model, outputs,
-                              schedule = TimeInterval(6hours),
+                              schedule = TimeInterval(20minutes),
                               filename = prefix * "_xyz.jld2",
                               overwrite_existing = true)
 
