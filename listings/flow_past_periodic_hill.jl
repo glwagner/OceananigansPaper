@@ -194,13 +194,14 @@ model = NonhydrostaticModel(; grid, velocities, pressure_solver, closure,
                             advection, forcing, boundary_conditions, auxiliary_fields, timestepper)
 
 @show model
+minimum_relative_step = 1e-10
 
-simulation = Simulation(model; Δt, stop_time)
-conjure_time_step_wizard!(simulation, cfl=0.5, IterationInterval(1); max_Δt, max_change=1.05)
+simulation = Simulation(model; Δt, stop_time, minimum_relative_step)
+conjure_time_step_wizard!(simulation, cfl=0.7, IterationInterval(10); max_Δt, max_change=1.05)
 
 wall_time = Ref(time_ns())
 
-d = ∂x(u) + ∂y(v) + ∂z(w)
+d = Field(∂x(u) + ∂y(v) + ∂z(w))
 
 function progress(sim)
     if pressure_solver isa ConjugateGradientPoissonSolver
@@ -209,16 +210,18 @@ function progress(sim)
         pressure_iters = 0
     end
 
-    msg = @sprintf("Iter: %d, time: %.2f, Δt: %.4f, Poisson iters: %d",
+    msg = @sprintf("Iter: %d, time: %.6f, Δt: %.4f, Poisson iters: %d",
                     iteration(sim), time(sim), sim.Δt, pressure_iters)
 
     elapsed = 1e-9 * (time_ns() - wall_time[])
 
-    msg *= @sprintf(", max u: %6.3e, max v: %6.3e, max w: %6.3e, Fu: %6.3e, wall time: %s",
-                    # maximum(d),
+    compute!(d)
+
+    msg *= @sprintf(", max u: %6.3e, max w: %6.3e, max d: %6.3e, max pressure: %6.3e, Fu: %6.3e, wall time: %s",
                     maximum(abs, sim.model.velocities.u),
-                    maximum(abs, sim.model.velocities.v),
                     maximum(abs, sim.model.velocities.w),
+                    maximum(abs, d),
+                    maximum(abs, sim.model.pressures.pNHS),
                     Fu[],
                     prettytime(elapsed))
 

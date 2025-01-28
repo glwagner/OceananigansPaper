@@ -173,8 +173,11 @@ velocity_bcs = FieldBoundaryConditions(top=no_slip, bottom=no_slip, immersed=no_
 boundary_conditions = (u=velocity_bcs, v=velocity_bcs)
 
 # ddp = DiagonallyDominantPreconditioner()
-# preconditioner = FFTBasedPoissonSolver(reduced_precision_grid)
-preconditioner = nothing
+preconditioner = FFTBasedPoissonSolver(reduced_precision_grid)
+prefix *= "precFFTrpg"
+# preconditioner = FFTBasedPoissonSolver(grid.underlying_grid)
+# prefix *= "precFFT"
+# preconditioner = nothing
 reltol = abstol = 1e-7
 
 if isnothing(preconditioner)
@@ -200,9 +203,10 @@ model = NonhydrostaticModel(; grid, velocities, pressure_solver, closure,
                             advection, forcing, boundary_conditions, auxiliary_fields, timestepper)
 
 @show model
+minimum_relative_step = 1e-10
 
-simulation = Simulation(model; Δt, stop_time)
-conjure_time_step_wizard!(simulation, cfl=0.5, IterationInterval(1); max_Δt, max_change=1.05)
+simulation = Simulation(model; Δt, stop_time, minimum_relative_step)
+conjure_time_step_wizard!(simulation, cfl=0.7, IterationInterval(10); max_Δt, max_change=1.05)
 
 wall_time = Ref(time_ns())
 
@@ -222,12 +226,11 @@ function progress(sim)
 
     compute!(d)
 
-    msg *= @sprintf(", max u: %6.3e, max w: %6.3e, max d: %6.3e, max mean res: (%6.3e, %6.3e), Fu: %6.3e, wall time: %s",
+    msg *= @sprintf(", max u: %6.3e, max w: %6.3e, max d: %6.3e, max pressure: %6.3e, Fu: %6.3e, wall time: %s",
                     maximum(abs, sim.model.velocities.u),
                     maximum(abs, sim.model.velocities.w),
                     maximum(abs, d),
-                    maximum(abs, model.pressure_solver.conjugate_gradient_solver.residual),
-                    mean(model.pressure_solver.conjugate_gradient_solver.residual),
+                    maximum(abs, sim.model.pressures.pNHS),
                     Fu[],
                     prettytime(elapsed))
 
