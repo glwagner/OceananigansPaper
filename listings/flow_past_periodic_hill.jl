@@ -266,6 +266,10 @@ simulation.output_writers[:averaged_jld2] = JLD2OutputWriter(model, outputs,
                                                              overwrite_existing = true,
                                                              with_halos = true)
 
+simulation.output_writers[:checkpointer] = Checkpointer(model,
+                                                        schedule = TimeInterval(50),
+                                                        prefix = "$(FILE_DIR)/checkpointer")
+
 run!(simulation)
 
 # xF = xnodes(grid, Face())
