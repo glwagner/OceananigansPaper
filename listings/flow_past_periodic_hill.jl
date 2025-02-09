@@ -66,8 +66,8 @@ Lz = 3.036H
 
 if Re ≈ 5600
     Nz = 512
-    Nx = 1500
-    Ny = 64
+    Nx = 1536
+    Ny = 32
 else
     Nz = floor_to_base2(1 / Re^-0.75 * 3.036)
     Nx = floor_to_base2(1 / Re^-0.75 * (3.8568 * α + 5.142))
@@ -202,6 +202,7 @@ conjure_time_step_wizard!(simulation, cfl=0.7, IterationInterval(10); max_Δt, m
 wall_time = Ref(time_ns())
 
 d = Field(∂x(u) + ∂y(v) + ∂z(w))
+pNHS = model.pressures.pNHS
 
 function progress(sim)
     if pressure_solver isa ConjugateGradientPoissonSolver
@@ -251,24 +252,24 @@ ubar = Average(u, dims=2)
 vbar = Average(v, dims=2)
 wbar = Average(w, dims=2)
 ζbar = Average(ζ, dims=2)
+dbar = Average(d, dims=2)
+pNHSbar = Average(pNHS, dims=2)
 
-outputs = (; ubar, vbar, wbar, ζbar)
+outputs = (; ubar, vbar, wbar, ζbar, dbar, pNHSbar)
 
 simulation.output_writers[:jld2] = JLD2OutputWriter(model, outputs,
                                                     schedule = TimeInterval(1),
                                                     filename = "$(OUTPUT_DIR)/fields.jld2",
-                                                    overwrite_existing = true,
                                                     with_halos = true)
 
 simulation.output_writers[:averaged_jld2] = JLD2OutputWriter(model, outputs,
-                                                             filename = "$(FILE_DIR)/averaged_fields",
-                                                             schedule = AveragedTimeInterval(1, window=1),
-                                                             overwrite_existing = true,
+                                                             filename = "$(OUTPUT_DIR)/averaged_fields.jld2",
+                                                             schedule = AveragedTimeInterval(20, window=20),
                                                              with_halos = true)
 
 simulation.output_writers[:checkpointer] = Checkpointer(model,
-                                                        schedule = TimeInterval(50),
-                                                        prefix = "$(FILE_DIR)/checkpointer")
+                                                        schedule = TimeInterval(40),
+                                                        prefix = "$(OUTPUT_DIR)/checkpointer")
 
 run!(simulation)
 
