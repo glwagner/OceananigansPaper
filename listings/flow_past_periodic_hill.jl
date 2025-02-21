@@ -25,6 +25,10 @@ function parse_commandline()
             help = "Solver to use"
             arg_type = String
             default = "cg"
+        "--pickup"
+            help = "Pick up from last checkpoint"
+            arg_type = Bool
+            default = true
     end
     return parse_args(s)
 end
@@ -271,7 +275,23 @@ simulation.output_writers[:checkpointer] = Checkpointer(model,
                                                         schedule = TimeInterval(40),
                                                         prefix = "$(OUTPUT_DIR)/checkpointer")
 
-run!(simulation)
+pickup = args["pickup"]
+
+if pickup
+    files = readdir(FILE_DIR)
+    checkpoint_files = files[occursin.("checkpoint_iteration", files)]
+    if !isempty(checkpoint_files)
+        checkpoint_iters = parse.(Int, [filename[findfirst("iteration", filename)[end]+1:findfirst(".jld2", filename)[1]-1] for filename in checkpoint_files])
+        pickup_iter = maximum(checkpoint_iters)
+        run!(simulation, pickup="$(FILE_DIR)/checkpoint_iteration$(pickup_iter).jld2")
+    else
+        run!(simulation)
+    end
+else
+    run!(simulation)
+end
+
+# run!(simulation)
 
 # xF = xnodes(grid, Face())
 # xC = xnodes(grid, Center())
