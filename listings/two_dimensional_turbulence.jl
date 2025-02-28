@@ -1,5 +1,4 @@
 using Oceananigans
-using Oceananigans.TurbulenceClosures: DynamicSmagorinsky
 using CairoMakie
 
 grid = RectilinearGrid(CPU(), halo=(5, 5),
