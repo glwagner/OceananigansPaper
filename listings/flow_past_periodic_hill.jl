@@ -279,11 +279,11 @@ pickup = args["pickup"]
 
 if pickup
     files = readdir(OUTPUT_DIR)
-    checkpoint_files = files[occursin.("checkpoint_iteration", files)]
+    checkpoint_files = files[occursin.("checkpointer_iteration", files)]
     if !isempty(checkpoint_files)
         checkpoint_iters = parse.(Int, [filename[findfirst("iteration", filename)[end]+1:findfirst(".jld2", filename)[1]-1] for filename in checkpoint_files])
         pickup_iter = maximum(checkpoint_iters)
-        run!(simulation, pickup="$(FILE_DIR)/checkpoint_iteration$(pickup_iter).jld2")
+        run!(simulation, pickup="$(OUTPUT_DIR)/checkpointer_iteration$(pickup_iter).jld2")
     else
         run!(simulation)
     end
