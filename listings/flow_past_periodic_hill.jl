@@ -64,7 +64,7 @@ solver = args["solver"]
 H = 1
 U₀ = 1
 
-Lx = (3.8568 * α + 5.142) * H
+Lx = (3.858 * α + 5.142) * H
 Ly = 0.1H
 Lz = 3.036H
 
@@ -133,7 +133,7 @@ periodic_hill(x, y, z) = hill(x, y, z) | hill(-x + Lx, y, z)
 # zs = hill.(xs, α, H) .+ hill.(-xs .+ Lx, α, H)
 
 FILE_DIR = "./Output"
-prefix = "flow_past_periodic_hill_$(solver)_Re$(Re)_alpha$(α)_Nxyz_$(Nx)x$(Ny)x$(Nz)"
+prefix = "flow_past_periodic_hill_wimmersed_$(solver)_Re$(Re)_alpha$(α)_Nxyz_$(Nx)x$(Ny)x$(Nz)"
 
 x = (0, Lx)
 y = (0, Ly)
@@ -172,8 +172,9 @@ closure = ScalarDiffusivity(ν=1/Re)
 timestepper = :RungeKutta3
 
 no_slip = ValueBoundaryCondition(0)
-velocity_bcs = FieldBoundaryConditions(top=no_slip, bottom=no_slip, immersed=no_slip)
-boundary_conditions = (u=velocity_bcs, v=velocity_bcs)
+uv_bcs = FieldBoundaryConditions(top=no_slip, bottom=no_slip, immersed=no_slip)
+w_bcs = FieldBoundaryConditions(immersed=no_slip)
+boundary_conditions = (u=uv_bcs, v=uv_bcs, w=w_bcs)
 
 # ddp = DiagonallyDominantPreconditioner()
 preconditioner = FFTBasedPoissonSolver(reduced_precision_grid)
@@ -189,10 +190,6 @@ end
 # pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=100)
 # pressure_solver = ConjugateGradientPoissonSolver(grid; preconditioner=ddp)
 # pressure_solver = nothing
-
-if isnothing(pressure_solver)
-    prefix *= "_fft"
-end
 
 model = NonhydrostaticModel(; grid, velocities, pressure_solver, closure,
                             advection, forcing, boundary_conditions, auxiliary_fields, timestepper)
