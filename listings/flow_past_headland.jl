@@ -17,7 +17,6 @@ grid = ImmersedBoundaryGrid(grid, GridFittedBottom(wedge))
 T₂ = 12.421hours
 U₂ = 0.1 # m/s
 
-@inline Fu(x, y, z, t, p) = 2π * p.U₂ / p.T₂ * cos(2π * t / p.T₂)
 @inline U(x, y, z, t, p) = p.U₂ * sin(2π * t / p.T₂)
 @inline U(y, z, t, p) = U(zero(y), y, z, t, p)
 
