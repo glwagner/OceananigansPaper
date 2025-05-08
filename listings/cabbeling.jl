@@ -36,11 +36,11 @@ add_callback!(simulation, progress, IterationInterval(10))
 ρ = Field(seawater_density(model))
 T = model.tracers.T
 
-output_writer = JLD2OutputWriter(model, (; ρ, T),
-                                 filename = "cabbeling",
-                                 schedule = TimeInterval(10),
-                                 #schedule = TimeInterval(1),
-                                 overwrite_existing = true)
+output_writer = JLD2Writer(model, (; ρ, T),
+                           filename = "cabbeling",
+                           schedule = TimeInterval(10),
+                           #schedule = TimeInterval(1),
+                           overwrite_existing = true)
                                         
 simulation.output_writers[:jld2] = output_writer
 

@@ -72,13 +72,13 @@ end
 simulation.callbacks[:progress] = Callback(progress, TimeInterval(5days))
 
 outputs = merge(ocean.model.tracers, ocean.model.velocities)
-ocean.output_writers[:surface] = JLD2OutputWriter(ocean.model, outputs;
-                                                  schedule = TimeInterval(1days),
-						                          filename = "near_global_surface_fields_$(arch.local_rank)",
-                                                  indices = (:, :, grid.Nz),
-                                                  with_halos = true,
-                                                  overwrite_existing = true,
-                                                  array_type = Array{Float32})
+ocean.output_writers[:surface] = JLD2Writer(ocean.model, outputs;
+                                            schedule = TimeInterval(1days),
+				            filename = "near_global_surface_fields_$(arch.local_rank)",
+                                            indices = (:, :, grid.Nz),
+                                            with_halos = true,
+                                            overwrite_existing = true,
+                                            array_type = Array{Float32})
 
 run!(simulation)
 simulation.stop_time = 120days
