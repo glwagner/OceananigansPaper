@@ -37,10 +37,10 @@ set!(model, b=bᵢ)
 
 simulation = Simulation(model; Δt=1minutes, stop_time=16T₂)
 
-writer = JLD2OutputWriter(model, merge(model.velocities, model.tracers),
-                          filename = "random_topography_internal_tide.jld2",
-                          schedule = TimeInterval(T₂/20),
-                          overwrite_existing=true)
+writer = JLD2Writer(model, merge(model.velocities, model.tracers),
+                    filename = "random_topography_internal_tide.jld2",
+                    schedule = TimeInterval(T₂/20),
+                    overwrite_existing=true)
 
 simulation.output_writers[:jld2] = writer
 

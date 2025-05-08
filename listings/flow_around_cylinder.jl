@@ -162,17 +162,17 @@ for Re in [Inf]
     ζ = ∂x(v) - ∂y(u)
     outputs = (; u, v, ζ, d)
 
-    simulation.output_writers[:jld2] = JLD2OutputWriter(model, outputs,
-                                                        schedule = TimeInterval(2),
-                                                        filename = prefix * "_fields.jld2",
-                                                        overwrite_existing = true,
-                                                        with_halos = true)
+    simulation.output_writers[:jld2] = JLD2Writer(model, outputs,
+                                                  schedule = TimeInterval(2),
+                                                  filename = prefix * "_fields.jld2",
+                                                  overwrite_existing = true,
+                                                  with_halos = true)
 
-    simulation.output_writers[:drag] = JLD2OutputWriter(model, (; drag_force),
-                                                        schedule = TimeInterval(0.1),
-                                                        filename = prefix * "_drag.jld2",
-                                                        overwrite_existing = true,
-                                                        with_halos = true)
+    simulation.output_writers[:drag] = JLD2Writer(model, (; drag_force),
+                                                  schedule = TimeInterval(0.1),
+                                                  filename = prefix * "_drag.jld2",
+                                                  overwrite_existing = true,
+                                                  with_halos = true)
      
     run!(simulation)
 end

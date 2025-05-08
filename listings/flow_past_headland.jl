@@ -73,22 +73,22 @@ using Oceananigans.BuoyancyFormulations: buoyancy
 q = Field(ErtelPotentialVorticity(model, model.velocities..., buoyancy(model), model.coriolis))
 outputs = merge(model.velocities, model.tracers, (; ζ, q))
 
-xy_writer = JLD2OutputWriter(model, outputs,
-                             indices = (:, :, grid.Nz),
-                             schedule = TimeInterval(10minutes),
-                             filename = prefix * "_xy.jld2",
-                             overwrite_existing = true)
+xy_writer = JLD2Writer(model, outputs,
+                       indices = (:, :, grid.Nz),
+                       schedule = TimeInterval(10minutes),
+                       filename = prefix * "_xy.jld2",
+                       overwrite_existing = true)
 
-xz_writer = JLD2OutputWriter(model, outputs,
-                             indices = (:, grid.Ny÷2, :),
-                             schedule = TimeInterval(10minutes),
-                             filename = prefix * "_xz.jld2",
-                             overwrite_existing = true)
+xz_writer = JLD2Writer(model, outputs,
+                       indices = (:, grid.Ny÷2, :),
+                       schedule = TimeInterval(10minutes),
+                       filename = prefix * "_xz.jld2",
+                       overwrite_existing = true)
 
-xyz_writer = JLD2OutputWriter(model, outputs,
-                              schedule = TimeInterval(20minutes),
-                              filename = prefix * "_xyz.jld2",
-                              overwrite_existing = true)
+xyz_writer = JLD2Writer(model, outputs,
+                        schedule = TimeInterval(20minutes),
+                        filename = prefix * "_xyz.jld2",
+                        overwrite_existing = true)
 
 simulation.output_writers[:xy] = xy_writer
 simulation.output_writers[:xz] = xz_writer

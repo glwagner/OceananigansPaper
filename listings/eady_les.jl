@@ -60,11 +60,11 @@ s = @at (Center, Center, Center) sqrt(u^2 + v^2)
 ∇b² = @at (Center, Center, Center) ∂x(b)^2 + ∂y(b)^2
 outputs = merge(model.velocities, model.tracers, (; ζ, s, ∇b²))
 
-xy = JLD2OutputWriter(model, outputs,
-                      filename = "eady_les.jld2",
-                      schedule = TimeInterval(10minutes),
-                      indices = (:, :, Nz),
-                      overwrite_existing = true)
+xy = JLD2Writer(model, outputs,
+                filename = "eady_les.jld2",
+                schedule = TimeInterval(10minutes),
+                indices = (:, :, Nz),
+                overwrite_existing = true)
 
 simulation.output_writers[:xy] = xy
 

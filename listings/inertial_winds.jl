@@ -64,14 +64,14 @@ outputs = merge(model.velocities, model.tracers)
 filename = string("wind_pulse_", grid.Nx)
 save_interval = 5minutes
 
-xyow = JLD2OutputWriter(model, outputs; filename=filename * "_xy.jld2",
-                        schedule=TimeInterval(save_interval), indices=(:, :, Nz), overwrite_existing=true)
+xyow = JLD2Writer(model, outputs; filename=filename * "_xy.jld2",
+                  schedule=TimeInterval(save_interval), indices=(:, :, Nz), overwrite_existing=true)
 
-yzow = JLD2OutputWriter(model, outputs; filename=filename * "_yz.jld2",
-                        schedule=TimeInterval(save_interval), indices=(1, :, :), overwrite_existing=true)
+yzow = JLD2Writer(model, outputs; filename=filename * "_yz.jld2",
+                  schedule=TimeInterval(save_interval), indices=(1, :, :), overwrite_existing=true)
 
-xzow = JLD2OutputWriter(model, outputs; filename=filename * "_xz.jld2",
-                        schedule=TimeInterval(save_interval), indices=(:, 1, :), overwrite_existing=true)
+xzow = JLD2Writer(model, outputs; filename=filename * "_xz.jld2",
+                  schedule=TimeInterval(save_interval), indices=(:, 1, :), overwrite_existing=true)
                         
 simulation.output_writers[:xy] = xyow
 simulation.output_writers[:xz] = xzow

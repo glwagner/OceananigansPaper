@@ -135,11 +135,11 @@ add_callback!(simulation, progress, IterationInterval(100))
 ζ = ∂x(v) - ∂y(u)
 outputs = (; ζ)
 
-simulation.output_writers[:jld2] = JLD2OutputWriter(model, outputs,
-                                                    schedule = TimeInterval(0.05),
-                                                    filename = "continued_" * filename,
-                                                    overwrite_existing = true,
-                                                    with_halos = true)
+simulation.output_writers[:jld2] = JLD2Writer(model, outputs,
+                                              schedule = TimeInterval(0.05),
+                                              filename = "continued_" * filename,
+                                              overwrite_existing = true,
+                                              with_halos = true)
 
 run!(simulation)
 

@@ -91,19 +91,19 @@ b = model.tracers.b
 u, v, w = model.velocities
 ζ = ∂x(v) - ∂y(u)
 outputs = (; u, v, w, ζ, b)
-xywriter = JLD2OutputWriter(model, outputs,
-                            filename = prefix * "_xy.jld2",
-                            indices = (:, :, Nz),
-                            schedule = TimeInterval(30minutes),
-                            overwrite_existing = true)
+xywriter = JLD2Writer(model, outputs,
+                      filename = prefix * "_xy.jld2",
+                      indices = (:, :, Nz),
+                      schedule = TimeInterval(30minutes),
+                      overwrite_existing = true)
 
 w² = w^2
 to_avg = (; u, v, w, w², b)
 avgoutputs = NamedTuple(name => Average(to_avg[name], dims=1) for name in keys(to_avg))
-avgwriter = JLD2OutputWriter(model, avgoutputs,
-                             filename = prefix * "_averages.jld2",
-                             schedule = TimeInterval(30minutes),
-                             overwrite_existing = true)
+avgwriter = JLD2Writer(model, avgoutputs,
+                       filename = prefix * "_averages.jld2",
+                       schedule = TimeInterval(30minutes),
+                       overwrite_existing = true)
 
 checkpointer = Checkpointer(model,
                             prefix = "multi_scale_les",

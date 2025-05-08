@@ -77,11 +77,11 @@ names = [:xz, :yz, :xy1, :xy2, :xy3]
 prefix = "double_gyre_Nx$(Nx)_Nz$(Nz)"
 
 for (name, indices) in zip(names, indiceses)
-    output_writer = JLD2OutputWriter(model, outputs; indices,
-                                     filename = string(prefix, "_", name),
-                                     schedule = TimeInterval(2day),
-                                     with_halos = true,
-                                     overwrite_existing = true)
+    output_writer = JLD2Writer(model, outputs; indices,
+                               filename = string(prefix, "_", name),
+                               schedule = TimeInterval(2day),
+                               with_halos = true,
+                               overwrite_existing = true)
                                           
     simulation.output_writers[name] = output_writer
 end
