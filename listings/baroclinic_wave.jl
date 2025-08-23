@@ -1,50 +1,51 @@
+#=
 using Oceananigans
 using Oceananigans.Units
 using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 using Printf
 using CUDA
-using CairoMakie
 
-function gaussian_islands_tripolar_grid(arch, Nx, Ny, Nz; halo=(7, 7, 7))
-    underlying_grid = TripolarGrid(arch; size=(Nx, Ny, Nz), halo, z=(-3000, 0))
-
-    zb = z[1]
-    h = -zb + 100
-    gaussian_islands(λ, φ) = zb + h * (mtn₁(λ, φ) + mtn₂(λ, φ))
-
-    return ImmersedBoundaryGrid(underlying_grid,
-                                GridFittedBottom(gaussian_islands);
-                                active_cells_map = false)
-end
-
-grid_type = "lat_lon"
+# grid_type = "lat_lon"
 grid_type = "tripolar"
 filename = "baroclinic_wave_" * grid_type
 
 arch = GPU()
-
 resolution = 1//2
 Nx = 360 ÷ resolution
 Ny = 160 ÷ resolution
 Nz = 10
+H = 3000
 
-grid = if grid_type == "lat_lon"
-    LatitudeLongitudeGrid(arch;
-                          size = (Nx, Ny, Nz),
-                          halo = (7, 7, 7),
-                          latitude = (-80, 80),
-                          longitude = (0, 360),
-                          z = (-3000, 0))
-elseif grid_type == "tripolar"
-    gaussian_islands_tripolar_grid(arch, Nx, Ny, Nz)
-end
+# Simple lat-lon grid
+lat_lon_grid =  LatitudeLongitudeGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 7),
+                                      latitude = (-80, 80), longitude = (0, 360), z = (-H, 0))
+
+# TripolarGrid with "Gaussian islands" over the two north poles
+dφ, dλ = 10, 20
+λ₀, φ₀ = 70, 55
+h = 100
+
+isle(λ, φ) = exp(-(λ - λ₀)^2 / 2dλ^2 - (φ - φ₀)^2 / 2dφ^2)
+gaussian_isles(λ, φ) = - H + (H + h) * (isle(λ, φ) + isle(λ - 180, φ))
+
+underlying_tripolar_grid = TripolarGrid(arch; size=(Nx, Ny, Nz), halo, z=(-H, 0))
+tripolar_grid = ImmersedBoundaryGrid(underlying_tripolar_grid, GridFittedBottom(gaussian_isles))
+
+Nh = Int(Nx / 6)
+cubed_sphere_grid = ConformalCubedSphereGrid(arch, panel_size = (Nh, Nh, Nz), panel_halo = (7, 7, 7),
+                                             z = (-H, 0))
+                                             
+grid = grid_type == "lat_lon" ? lat_lon_grid :
+       grid_type == "tripolar" ? tripolar_grid :
+       grid_type == "cubed_sphere" ? cubed_sphere_grid : nothing
 
 momentum_advection = WENOVectorInvariant(order=9)
-tracer_advection   = WENO(order=7)
+tracer_advection = WENO(order=7)
 coriolis = HydrostaticSphericalCoriolis()
 buoyancy = SeawaterBuoyancy(equation_of_state=TEOS10EquationOfState())
+free_surface = SplitExplicitFreeSurface(grid, substeps=30)
 
-model = HydrostaticFreeSurfaceModel(; grid, coriolis,
+model = HydrostaticFreeSurfaceModel(; grid, coriolis, free_surface,
                                       buoyancy, tracers=(:T, :S),
                                       momentum_advection, tracer_advection)
 
@@ -81,87 +82,29 @@ S = model.tracers.S
 ζ = ∂x(v) - ∂y(u)
 fields = (; u, v, w, T, S, ζ)
 
-ow = JLD2OutputWriter(model, fields,
-                      filename = filename * ".jld2",
-                      indices = (:, :, grid.Nz),
-                      schedule = TimeInterval(0.5days),
-                      overwrite_existing = true)
+ow = JLD2Writer(model, fields,
+                filename = filename * ".jld2",
+                indices = (:, :, grid.Nz),
+                schedule = TimeInterval(0.5days),
+                overwrite_existing = true)
 
 simulation.output_writers[:surface] = ow
 
 run!(simulation)
+=#
 
-#=
 using Oceananigans
 using Oceananigans.Units
 using GLMakie
-
-
-u = FieldTimeSeries(filename * ".jld2", "u"; backend = OnDisk())
-v = FieldTimeSeries(filename * ".jld2", "v"; backend = OnDisk())
-T = FieldTimeSeries(filename * ".jld2", "T"; backend = OnDisk())
-ζ = FieldTimeSeries(filename * ".jld2", "ζ"; backend = OnDisk())
-
-times = u.times
-Nt = length(times)
-
-n = Observable(Nt)
-
-ζn = @lift ζ[$n]
-
-Tn = @lift T[$n]
-Sn = @lift S[$n]
-
-un = Field{Face, Center, Nothing}(u.grid)
-vn = Field{Center, Face, Nothing}(v.grid)
-s = Field(sqrt(un^2 + vn^2))
-
-sn = @lift begin
-    parent(un) .= parent(u[$n])
-    parent(vn) .= parent(v[$n])
-    compute!(s)
-end
-
-fig = Figure(size=(800, 1200))
-
-kwargs_axis = (xticks = 0:60:360, yticks = -80:40:80)
-axs = Axis(fig[2, 1]; kwargs_axis...)
-axζ = Axis(fig[3, 1]; kwargs_axis...)
-axT = Axis(fig[4, 1]; kwargs_axis...)
-
-hm = heatmap!(axs, sn, colorrange=(0, 6))
-Colorbar(fig[2, 2], hm, label = "Surface speed (m s⁻¹)", labelsize=20)
-
-hm = heatmap!(axζ, ζn, colormap=:balance, colorrange=(-3e-5, 3e-5))
-ticks = (-2e-5:1e-5:2e-5, ["-2", "-1", "0", "1", "2"])
-Colorbar(fig[3, 2], hm; ticks, label = "relative vorticity (10⁻⁵ s⁻¹)", labelsize=20)
-
-hm = heatmap!(axT, Tn, colormap=:thermal, colorrange=(0, 31))
-Colorbar(fig[4, 2], hm, label = "surface temperature (ᵒC)", labelsize=20)
-
-title = @lift @sprintf("%s days", round(times[$n] / day, digits=2))
-fig[1, :] = Label(fig, title, tellwidth=false)
-
-fig
-
-
-n[] = 1
-save(filename * "_initial_snapshot.png", fig)
-
-n[] = Nt
-save(filename * "_final_snapshot.png", fig)
-
-record(fig, filename * ".mp4", 1:Nt, framerate = 16) do nn
-    @info "Drawing frame $nn of $Nt..."
-    n[] = nn
-end
-
+using Printf
 
 function geographic2cartesian(λ, φ, r=1)
-    Nλ = length(λ)
-    Nφ = length(φ)
-    λ = repeat(reshape(λ, Nλ, 1), 1, Nφ)
-    φ = repeat(reshape(φ, 1, Nφ), Nλ, 1)
+    if ndims(λ) == 1
+        Nλ = length(λ)
+        Nφ = length(φ)
+        λ = repeat(reshape(λ, Nλ, 1), 1, Nφ)
+        φ = repeat(reshape(φ, 1, Nφ), Nλ, 1)
+    end
 
     λ_azimuthal = λ .+ 180  # Convert to λ ∈ [0°, 360°]
     φ_azimuthal = 90 .- φ   # Convert to φ ∈ [0°, 180°] (0° at north pole)
@@ -173,72 +116,104 @@ function geographic2cartesian(λ, φ, r=1)
     return x, y, z
 end
 
-u = FieldTimeSeries(filename * ".jld2", "u"; backend = OnDisk())
-v = FieldTimeSeries(filename * ".jld2", "v"; backend = OnDisk())
-T = FieldTimeSeries(filename * ".jld2", "T"; backend = OnDisk())
-ζ = FieldTimeSeries(filename * ".jld2", "ζ"; backend = OnDisk())
 
-times = u.times
+fig = Figure(size=(1200, 900))
+
+kw = (elevation= deg2rad(50), azimuth=deg2rad(0), aspect=:equal)
+
+axζ1 = Axis3(fig[1, 1]; kw...)
+axT1 = Axis3(fig[2, 1]; kw...)
+axζ2 = Axis3(fig[1, 2]; kw...)
+axT2 = Axis3(fig[2, 2]; kw...)
+axζ3 = Axis3(fig[1, 3]; kw...)
+axT3 = Axis3(fig[2, 3]; kw...)
+
+#slider = Slider(fig[3, 1:3], range=1:Nt, startvalue=1)
+#n = slider.value
+n = Observable(361)
+
+filename1 = "baroclinic_wave_lat_lon"
+filename2 = "baroclinic_wave_tripolar"
+filename3 = "baroclinic_wave_tripolar"
+
+T1 = FieldTimeSeries(filename1 * ".jld2", "T"; backend = OnDisk())
+ζ1 = FieldTimeSeries(filename1 * ".jld2", "ζ"; backend = OnDisk())
+
+T2 = FieldTimeSeries(filename2 * ".jld2", "T"; backend = OnDisk())
+ζ2 = FieldTimeSeries(filename2 * ".jld2", "ζ"; backend = OnDisk())
+
+T3 = FieldTimeSeries(filename3 * ".jld2", "T"; backend = OnDisk())
+ζ3 = FieldTimeSeries(filename3 * ".jld2", "ζ"; backend = OnDisk())
+
+times = T1.times
 Nt = length(times)
 
-grid = u.grid
-λ = λnodes(grid, Center(), Center(), Center())
-φ = φnodes(grid, CeP0+r\nter(), Center(), Center())
-x, y, z = geographic2cartesian(λ, φ)
+grid1 = T1.grid
+λ1 = λnodes(grid1, Center(), Center(), Center())
+φ1 = φnodes(grid1, Center(), Center(), Center())
+x1, y1, z1 = geographic2cartesian(λ1, φ1)
 
-Nx, Ny, Nz = size(grid)
+grid2 = T2.grid
+λ2 = λnodes(grid2, Center(), Center(), Center())
+φ2 = φnodes(grid2, Center(), Center(), Center())
+x2, y2, z2 = geographic2cartesian(λ2, φ2)
 
-n = Observable(1)
+grid3 = T3.grid
+λ3 = λnodes(grid3, Center(), Center(), Center())
+φ3 = φnodes(grid3, Center(), Center(), Center())
+x3, y3, z3 = geographic2cartesian(λ3, φ3)
 
-ζn = @lift 1e5 * interior(ζ[$n], :, :, 1)
-Tn = @lift interior(T[$n], :, :, 1)
+ζ1n = @lift 1e5 * interior(ζ1[$n], :, :, 1)
+T1n = @lift interior(T1[$n], :, :, 1)
 
-un = Field{Face, Center, Nothing}(u.grid)
-vn = Field{Center, Face, Nothing}(v.grid)
-s = Field(sqrt(un^2 + vn^2))
+ζ2n = @lift 1e5 * interior(ζ2[$n], :, :, 1)
+T2n = @lift interior(T2[$n], :, :, 1)
 
-sn = @lift begin
-    parent(un) .= parent(u[$n])
-    parent(vn) .= parent(v[$n])
-    compute!(s)
-    interior(s, :, :, 1)
-end
+ζ3n = @lift 1e5 * interior(ζ3[$n], :, :, 1)
+T3n = @lift interior(T3[$n], :, :, 1)
 
-fig = Figure(size=(1400, 700))
+sf = surface!(axζ1, x1, y1, z1, color=ζ1n, colorrange=(-3, 3), colormap=:balance, nan_color=:lightgray)
+sf = surface!(axζ2, x2, y2, z2, color=ζ2n, colorrange=(-3, 3), colormap=:balance, nan_color=:lightgray)
+sf = surface!(axζ3, x3, y3, z3, color=ζ3n, colorrange=(-3, 3), colormap=:balance, nan_color=:lightgray)
 
-kw = (elevation= deg2rad(-10), azimuth=deg2rad(90), aspect=:equal)
+Colorbar(fig[1, 4], sf, height=Relative(0.6), flipaxis=true, vertical=true,
+         label="Relative vorticity (10⁻⁵ s⁻¹)", labelsize=20)
 
-axs = Axis3(fig[1, 1]; kw...)
-axζ = Axis3(fig[1, 2]; kw...)
-axT = Axis3(fig[1, 3]; kw...)
+sf = surface!(axT1, x1, y1, z1, color=T1n, colorrange=(0, 31), colormap=:thermal, nan_color=:lightgray)
+sf = surface!(axT2, x2, y2, z2, color=T2n, colorrange=(0, 31), colormap=:thermal, nan_color=:lightgray)
+sf = surface!(axT3, x3, y3, z3, color=T3n, colorrange=(0, 31), colormap=:thermal, nan_color=:lightgray)
 
-sf = surface!(axs, x, y, z, color=sn, colorrange=(0, 6), colormap=:viridis, nan_color=:lightgray)
-Colorbar(fig[2, 1], sf, width=Relative(0.6), vertical=false, label = "Surface speed (m s⁻¹)", labelsize=20)
+Colorbar(fig[2, 4], sf, height=Relative(0.6), flipaxis=true, vertical=true,
+         label="Surface temperature (ᵒC)", labelsize=20)
 
-sf = surface!(axζ, x, y, z, color=ζn, colorrange=(-3, 3), colormap=:balance, nan_color=:lightgray)
-Colorbar(fig[2, 2], sf, width=Relative(0.6), vertical=false, label = "relative vorticity (10⁻⁵ s⁻¹)", labelsize=20)
-
-sf = surface!(axT, x, y, z, color=Tn, colorrange=(0, 31), colormap=:thermal, nan_color=:lightgray)
-Colorbar(fig[2, 3], sf, width=Relative(0.6), vertical=false, label = "surface temperature (ᵒC)", labelsize=20)
-
-
-t = u.times
 title = @lift @sprintf("%s days", round((times[$n]+ 1e-6) / day, digits=2))
-Label(fig[0, :], title, fontsize=24)
+#Label(fig[0, :], title, fontsize=24)
 
-hidedecorations!(axζ)
-hidedecorations!(axs)
-hidedecorations!(axT)
-hidespines!(axζ)
-hidespines!(axs)
-hidespines!(axT)
+Label(fig[0, 1], "Latitude-Longitude Grid", tellwidth=false, fontsize=24)
+Label(fig[0, 2], "Tripolar Grid", tellwidth=false, fontsize=24)
+Label(fig[0, 3], "Cubed Sphere Grid", tellwidth=false, fontsize=24)
+
+hidedecorations!(axζ1)
+hidedecorations!(axT1)
+hidedecorations!(axζ2)
+hidedecorations!(axT2)
+hidedecorations!(axζ3)
+hidedecorations!(axT3)
+hidespines!(axζ1)
+hidespines!(axT1)
+hidespines!(axζ2)
+hidespines!(axT2)
+hidespines!(axζ3)
+hidespines!(axT3)
 
 rowgap!(fig.layout, 1, Relative(-0.1))
-colgap!(fig.layout, 1, Relative(-0.07))
-colgap!(fig.layout, 2, Relative(-0.07))
+rowgap!(fig.layout, 2, Relative(-0.2))
+colgap!(fig.layout, 1, Relative(-0.05))
+colgap!(fig.layout, 2, Relative(-0.05))
 
 fig
 
+#=
 n[] = 1
 save(filename * "_initial_snapshot_sphere.png", fig)
 
