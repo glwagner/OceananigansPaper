@@ -1,45 +1,50 @@
-#=
 using Oceananigans
+using Oceananigans.OrthogonalSphericalShellGrids: RotatedLatitudeLongitudeGrid
 using Oceananigans.Units
 using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 using Printf
 using CUDA
 
 # grid_type = "lat_lon"
-grid_type = "tripolar"
+# grid_type = "rotated_lat_lon"
+# grid_type = "tripolar"
+grid_type = "cubed_sphere"
 filename = "baroclinic_wave_" * grid_type
 
 arch = GPU()
 resolution = 1//2
 Nx = 360 ÷ resolution
-Ny = 160 ÷ resolution
+Ny = 170 ÷ resolution
 Nz = 10
 H = 3000
 
-# Simple lat-lon grid
-lat_lon_grid =  LatitudeLongitudeGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 7),
-                                      latitude = (-80, 80), longitude = (0, 360), z = (-H, 0))
-
-# TripolarGrid with "Gaussian islands" over the two north poles
-dφ, dλ = 10, 20
-λ₀, φ₀ = 70, 55
-h = 100
-
-isle(λ, φ) = exp(-(λ - λ₀)^2 / 2dλ^2 - (φ - φ₀)^2 / 2dφ^2)
-gaussian_isles(λ, φ) = - H + (H + h) * (isle(λ, φ) + isle(λ - 180, φ))
-
-underlying_tripolar_grid = TripolarGrid(arch; size=(Nx, Ny, Nz), halo, z=(-H, 0))
-tripolar_grid = ImmersedBoundaryGrid(underlying_tripolar_grid, GridFittedBottom(gaussian_isles))
-
-Nh = Int(Nx / 6)
-cubed_sphere_grid = ConformalCubedSphereGrid(arch, panel_size = (Nh, Nh, Nz), panel_halo = (7, 7, 7),
-                                             z = (-H, 0))
+grid = if grid_type == "lat_lon"
+  LatitudeLongitudeGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 7),
+                        latitude = (-85, 85), longitude = (0, 360), z = (-H, 0))
+elseif grid_type == "tripolar"
+    # TripolarGrid with "Gaussian islands" over the two north poles
+    dφ, dλ = 10, 20
+    λ₀, φ₀ = 70, 55
+    h = 100
+    
+    isle(λ, φ) = exp(-(λ - λ₀)^2 / 2dλ^2 - (φ - φ₀)^2 / 2dφ^2)
+    gaussian_isles(λ, φ) = - H + (H + h) * (isle(λ, φ) + isle(λ - 180, φ))
+    
+    underlying_grid = TripolarGrid(arch; size=(Nx, Ny, Nz), halo=(7, 7, 7), z=(-H, 0))
+    ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(gaussian_isles))
+elseif grid_type == "rotated_lat_lon"
+    RotatedLatitudeLongitudeGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 7),
+                                 north_pole = (70, 55),
+                                 latitude = (-85, 85), longitude = (0, 360), z = (-H, 0))
+elseif grid_type == "cubed_sphere"
+    Np = 32 #Int(Nx / 6)
+    ConformalCubedSphereGrid(arch, panel_size=(Np, Np, Nz),
+                             z_halo=7, horizontal_direction_halo=7, z=(-H, 0))
+else
+    error("Dont understand grid_type $grid_type")
+end
                                              
-grid = grid_type == "lat_lon" ? lat_lon_grid :
-       grid_type == "tripolar" ? tripolar_grid :
-       grid_type == "cubed_sphere" ? cubed_sphere_grid : nothing
-
-momentum_advection = WENOVectorInvariant(order=9)
+momentum_advection = WENOVectorInvariant(order=7)
 tracer_advection = WENO(order=7)
 coriolis = HydrostaticSphericalCoriolis()
 buoyancy = SeawaterBuoyancy(equation_of_state=TEOS10EquationOfState())
@@ -53,7 +58,8 @@ Tᵢ(λ, φ, z) = 30 * (1 - tanh((abs(φ) - 45) / 8)) / 2 + rand()
 Sᵢ(λ, φ, z) = 28 - 5e-3 * z + rand()
 set!(model, T=Tᵢ, S=Sᵢ)
 
-simulation = Simulation(model, Δt=5minutes, stop_time=200days)
+#simulation = Simulation(model, Δt=20, stop_time=200days)
+simulation = Simulation(model, Δt=1minutes, stop_iteration=100)
 
 function progress(sim)
     T = sim.model.tracers.T
@@ -85,14 +91,17 @@ fields = (; u, v, w, T, S, ζ)
 ow = JLD2Writer(model, fields,
                 filename = filename * ".jld2",
                 indices = (:, :, grid.Nz),
-                schedule = TimeInterval(0.5days),
+                #schedule = TimeInterval(0.5days),
+                schedule = IterationInterval(10),
                 overwrite_existing = true)
 
 simulation.output_writers[:surface] = ow
 
 run!(simulation)
-=#
 
+T = FieldTimeSeries(filename * ".jld2", "T"; backend = OnDisk())
+
+#=
 using Oceananigans
 using Oceananigans.Units
 using GLMakie
@@ -212,6 +221,7 @@ colgap!(fig.layout, 1, Relative(-0.05))
 colgap!(fig.layout, 2, Relative(-0.05))
 
 fig
+=#
 
 #=
 n[] = 1
