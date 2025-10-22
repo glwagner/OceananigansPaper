@@ -6,39 +6,35 @@ using Printf
 using CUDA
 
 # grid_type = "lat_lon"
-grid_type = "tripolar"
+# grid_type = "tripolar"
+grid_type = "cubed_sphere"
 filename = "baroclinic_wave_" * grid_type
 
-arch = GPU()
-resolution = 1//2
-Nx = 360 ÷ resolution
-Ny = 160 ÷ resolution
-Nz = 10
-H = 3000
+arch = CPU()
+res = 1//2 # degrees
+Nx, Ny, Nz = 360 ÷ res, 170 ÷ res, 10
+H = 3000 # domain depth
 
 # Simple lat-lon grid
-lat_lon_grid =  LatitudeLongitudeGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 7),
-                                      latitude = (-80, 80), longitude = (0, 360), z = (-H, 0))
+grid = if grid_type == "lat_lon"
+    LatitudeLongitudeGrid(arch; size=(Nx, Ny, Nz), halo=(7, 7, 7),
+                          latitude=(-85, 85), longitude=(0, 360), z=(-H, 0))
+elseif grid_type == "tripolar"
+    underlying_grid = TripolarGrid(arch; size=(Nx, Ny, Nz), halo=(7, 7, 7), z=(-H, 0))
 
-# TripolarGrid with "Gaussian islands" over the two north poles
-dφ, dλ = 10, 20
-λ₀, φ₀ = 70, 55
-h = 100
+    # Add bathymetry to cover north pole singularities:
+    dφ, dλ, λ₀, φ₀, h = 10, 20, 70, 55, 100
+    isle(λ, φ) = exp(-(λ - λ₀)^2 / 2dλ^2 - (φ - φ₀)^2 / 2dφ^2)
+    gaussian_isles(λ, φ) = - H + (H + h) * (isle(λ, φ) + isle(λ - 180, φ))
 
-isle(λ, φ) = exp(-(λ - λ₀)^2 / 2dλ^2 - (φ - φ₀)^2 / 2dφ^2)
-gaussian_isles(λ, φ) = - H + (H + h) * (isle(λ, φ) + isle(λ - 180, φ))
-
-underlying_tripolar_grid = TripolarGrid(arch; size=(Nx, Ny, Nz), halo, z=(-H, 0))
-tripolar_grid = ImmersedBoundaryGrid(underlying_tripolar_grid, GridFittedBottom(gaussian_isles))
-
-Nh = Int(Nx / 6)
-cubed_sphere_grid = ConformalCubedSphereGrid(arch, panel_size = (Nh, Nh, Nz), panel_halo = (7, 7, 7),
-                                             z = (-H, 0))
-                                             
-grid = grid_type == "lat_lon" ? lat_lon_grid :
-       grid_type == "tripolar" ? tripolar_grid :
-       grid_type == "cubed_sphere" ? cubed_sphere_grid : nothing
-
+    ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(gaussian_isles))
+elseif grid_type == "cubed_sphere"
+    Nh = 32 #Int(Nx / 6)
+    ConformalCubedSphereGrid(arch, panel_size=(Nh, Nh, Nz), horizontal_direction_halo=7, z=(-H, 0))
+else
+    error("Not sure what grid we should make for grid_type=$grid_type !")
+end
+ 
 momentum_advection = WENOVectorInvariant(order=9)
 tracer_advection = WENO(order=7)
 coriolis = HydrostaticSphericalCoriolis()
@@ -53,7 +49,8 @@ Tᵢ(λ, φ, z) = 30 * (1 - tanh((abs(φ) - 45) / 8)) / 2 + rand()
 Sᵢ(λ, φ, z) = 28 - 5e-3 * z + rand()
 set!(model, T=Tᵢ, S=Sᵢ)
 
-simulation = Simulation(model, Δt=5minutes, stop_time=200days)
+#simulation = Simulation(model, Δt=5minutes, stop_time=200days)
+simulation = Simulation(model, Δt=5minutes, stop_iteration=10)
 
 function progress(sim)
     T = sim.model.tracers.T
@@ -74,7 +71,7 @@ function progress(sim)
     return nothing
 end
 
-add_callback!(simulation, progress, IterationInterval(100))
+add_callback!(simulation, progress, IterationInterval(1))
 
 u, v, w = model.velocities
 T = model.tracers.T
@@ -95,6 +92,7 @@ run!(simulation)
 
 using Oceananigans
 using Oceananigans.Units
+using CUDA
 using GLMakie
 using Printf
 
@@ -116,7 +114,6 @@ function geographic2cartesian(λ, φ, r=1)
     return x, y, z
 end
 
-
 fig = Figure(size=(1200, 900))
 
 kw = (elevation= deg2rad(50), azimuth=deg2rad(0), aspect=:equal)
@@ -134,7 +131,8 @@ n = Observable(361)
 
 filename1 = "baroclinic_wave_lat_lon"
 filename2 = "baroclinic_wave_tripolar"
-filename3 = "baroclinic_wave_tripolar"
+#filename3 = "baroclinic_wave_tripolar"
+filename3 = "baroclinic_wave_rotated_lat_lon"
 
 T1 = FieldTimeSeries(filename1 * ".jld2", "T"; backend = OnDisk())
 ζ1 = FieldTimeSeries(filename1 * ".jld2", "ζ"; backend = OnDisk())
@@ -142,8 +140,8 @@ T1 = FieldTimeSeries(filename1 * ".jld2", "T"; backend = OnDisk())
 T2 = FieldTimeSeries(filename2 * ".jld2", "T"; backend = OnDisk())
 ζ2 = FieldTimeSeries(filename2 * ".jld2", "ζ"; backend = OnDisk())
 
-T3 = FieldTimeSeries(filename3 * ".jld2", "T"; backend = OnDisk())
-ζ3 = FieldTimeSeries(filename3 * ".jld2", "ζ"; backend = OnDisk())
+T3 = FieldTimeSeries(filename3 * ".jld2", "T") #; backend = OnDisk())
+ζ3 = FieldTimeSeries(filename3 * ".jld2", "ζ") #; backend = OnDisk())
 
 times = T1.times
 Nt = length(times)
@@ -158,7 +156,9 @@ grid2 = T2.grid
 φ2 = φnodes(grid2, Center(), Center(), Center())
 x2, y2, z2 = geographic2cartesian(λ2, φ2)
 
-grid3 = T3.grid
+# Special treatment for cubed sphere stuff
+grid3 = LatitudeLongitudeGrid(size=(4 * 360, 4 * 180, 1), longitude=(0, 360), latitude=(-90, 90), z=(-1, 0))
+# grid3 = T3.grid
 λ3 = λnodes(grid3, Center(), Center(), Center())
 φ3 = φnodes(grid3, Center(), Center(), Center())
 x3, y3, z3 = geographic2cartesian(λ3, φ3)
@@ -169,8 +169,20 @@ T1n = @lift interior(T1[$n], :, :, 1)
 ζ2n = @lift 1e5 * interior(ζ2[$n], :, :, 1)
 T2n = @lift interior(T2[$n], :, :, 1)
 
-ζ3n = @lift 1e5 * interior(ζ3[$n], :, :, 1)
-T3n = @lift interior(T3[$n], :, :, 1)
+ζ3llg = Field{Face, Face, Center}(grid3)
+T3llg = CenterField(grid3)
+
+using Oceananigans.Fields: interpolate!
+
+ζ3n = @lift begin
+    interpolate!(ζ3llg, ζ3[$n])
+    1e5 * interior(ζ3llg, :, :, 1)
+end
+
+T3n = @lift begin
+    interpolate!(T3llg, T3[$n])
+    interior(T3llg, :, :, 1)
+end
 
 sf = surface!(axζ1, x1, y1, z1, color=ζ1n, colorrange=(-3, 3), colormap=:balance, nan_color=:lightgray)
 sf = surface!(axζ2, x2, y2, z2, color=ζ2n, colorrange=(-3, 3), colormap=:balance, nan_color=:lightgray)
