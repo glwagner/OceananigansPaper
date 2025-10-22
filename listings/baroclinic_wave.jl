@@ -45,6 +45,33 @@ else
 end
                                              
 momentum_advection = WENOVectorInvariant(order=7)
+=======
+arch = CPU()
+res = 1//2 # degrees
+Nx, Ny, Nz = 360 ÷ res, 170 ÷ res, 10
+H = 3000 # domain depth
+
+# Simple lat-lon grid
+grid = if grid_type == "lat_lon"
+    LatitudeLongitudeGrid(arch; size=(Nx, Ny, Nz), halo=(7, 7, 7),
+                          latitude=(-85, 85), longitude=(0, 360), z=(-H, 0))
+elseif grid_type == "tripolar"
+    underlying_grid = TripolarGrid(arch; size=(Nx, Ny, Nz), halo=(7, 7, 7), z=(-H, 0))
+
+    # Add bathymetry to cover north pole singularities:
+    dφ, dλ, λ₀, φ₀, h = 10, 20, 70, 55, 100
+    isle(λ, φ) = exp(-(λ - λ₀)^2 / 2dλ^2 - (φ - φ₀)^2 / 2dφ^2)
+    gaussian_isles(λ, φ) = - H + (H + h) * (isle(λ, φ) + isle(λ - 180, φ))
+
+    ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(gaussian_isles))
+elseif grid_type == "cubed_sphere"
+    Nh = 32 #Int(Nx / 6)
+    ConformalCubedSphereGrid(arch, panel_size=(Nh, Nh, Nz), horizontal_direction_halo=7, z=(-H, 0))
+else
+    error("Not sure what grid we should make for grid_type=$grid_type !")
+end
+ 
+momentum_advection = WENOVectorInvariant(order=9)
 tracer_advection = WENO(order=7)
 coriolis = HydrostaticSphericalCoriolis()
 buoyancy = SeawaterBuoyancy(equation_of_state=TEOS10EquationOfState())
@@ -59,7 +86,8 @@ Sᵢ(λ, φ, z) = 28 - 5e-3 * z + rand()
 set!(model, T=Tᵢ, S=Sᵢ)
 
 #simulation = Simulation(model, Δt=20, stop_time=200days)
-simulation = Simulation(model, Δt=1minutes, stop_iteration=100)
+#simulation = Simulation(model, Δt=1minutes, stop_iteration=100)
+simulation = Simulation(model, Δt=5minutes, stop_time=200days)
 
 function progress(sim)
     T = sim.model.tracers.T
@@ -80,7 +108,7 @@ function progress(sim)
     return nothing
 end
 
-add_callback!(simulation, progress, IterationInterval(100))
+add_callback!(simulation, progress, IterationInterval(1))
 
 u, v, w = model.velocities
 T = model.tracers.T
@@ -104,6 +132,7 @@ T = FieldTimeSeries(filename * ".jld2", "T"; backend = OnDisk())
 #=
 using Oceananigans
 using Oceananigans.Units
+using CUDA
 using GLMakie
 using Printf
 
@@ -125,7 +154,6 @@ function geographic2cartesian(λ, φ, r=1)
     return x, y, z
 end
 
-
 fig = Figure(size=(1200, 900))
 
 kw = (elevation= deg2rad(50), azimuth=deg2rad(0), aspect=:equal)
@@ -143,7 +171,8 @@ n = Observable(361)
 
 filename1 = "baroclinic_wave_lat_lon"
 filename2 = "baroclinic_wave_tripolar"
-filename3 = "baroclinic_wave_tripolar"
+#filename3 = "baroclinic_wave_tripolar"
+filename3 = "baroclinic_wave_rotated_lat_lon"
 
 T1 = FieldTimeSeries(filename1 * ".jld2", "T"; backend = OnDisk())
 ζ1 = FieldTimeSeries(filename1 * ".jld2", "ζ"; backend = OnDisk())
@@ -151,8 +180,8 @@ T1 = FieldTimeSeries(filename1 * ".jld2", "T"; backend = OnDisk())
 T2 = FieldTimeSeries(filename2 * ".jld2", "T"; backend = OnDisk())
 ζ2 = FieldTimeSeries(filename2 * ".jld2", "ζ"; backend = OnDisk())
 
-T3 = FieldTimeSeries(filename3 * ".jld2", "T"; backend = OnDisk())
-ζ3 = FieldTimeSeries(filename3 * ".jld2", "ζ"; backend = OnDisk())
+T3 = FieldTimeSeries(filename3 * ".jld2", "T") #; backend = OnDisk())
+ζ3 = FieldTimeSeries(filename3 * ".jld2", "ζ") #; backend = OnDisk())
 
 times = T1.times
 Nt = length(times)
@@ -167,7 +196,9 @@ grid2 = T2.grid
 φ2 = φnodes(grid2, Center(), Center(), Center())
 x2, y2, z2 = geographic2cartesian(λ2, φ2)
 
-grid3 = T3.grid
+# Special treatment for cubed sphere stuff
+grid3 = LatitudeLongitudeGrid(size=(4 * 360, 4 * 180, 1), longitude=(0, 360), latitude=(-90, 90), z=(-1, 0))
+# grid3 = T3.grid
 λ3 = λnodes(grid3, Center(), Center(), Center())
 φ3 = φnodes(grid3, Center(), Center(), Center())
 x3, y3, z3 = geographic2cartesian(λ3, φ3)
@@ -178,8 +209,20 @@ T1n = @lift interior(T1[$n], :, :, 1)
 ζ2n = @lift 1e5 * interior(ζ2[$n], :, :, 1)
 T2n = @lift interior(T2[$n], :, :, 1)
 
-ζ3n = @lift 1e5 * interior(ζ3[$n], :, :, 1)
-T3n = @lift interior(T3[$n], :, :, 1)
+ζ3llg = Field{Face, Face, Center}(grid3)
+T3llg = CenterField(grid3)
+
+using Oceananigans.Fields: interpolate!
+
+ζ3n = @lift begin
+    interpolate!(ζ3llg, ζ3[$n])
+    1e5 * interior(ζ3llg, :, :, 1)
+end
+
+T3n = @lift begin
+    interpolate!(T3llg, T3[$n])
+    interior(T3llg, :, :, 1)
+end
 
 sf = surface!(axζ1, x1, y1, z1, color=ζ1n, colorrange=(-3, 3), colormap=:balance, nan_color=:lightgray)
 sf = surface!(axζ2, x2, y2, z2, color=ζ2n, colorrange=(-3, 3), colormap=:balance, nan_color=:lightgray)
