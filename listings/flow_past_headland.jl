@@ -1,7 +1,6 @@
 using Oceananigans
 using Oceananigans.Units
 using SeawaterPolynomials: TEOS10EquationOfState
-using Oceananigans.BoundaryConditions: PerturbationAdvectionOpenBoundaryCondition
 
 H, L = 256meters, 1024meters
 δ = L / 2
@@ -20,9 +19,8 @@ U₂ = 0.1 # m/s
 @inline U(x, y, z, t, p) = p.U₂ * sin(2π * t / p.T₂)
 @inline U(y, z, t, p) = U(zero(y), y, z, t, p)
 
-open_bc = PerturbationAdvectionOpenBoundaryCondition(U; inflow_timescale = 2minutes,
-                                                        outflow_timescale = 2minutes,
-                                                        parameters=(; U₂, T₂))
+open_bc = OpenBoundaryCondition(U; parameters=(; U₂, T₂),
+                                   scheme = PerturbationAdvection(inflow_timescale = 2minutes, outflow_timescale = 2minutes))
 
 u_bcs = FieldBoundaryConditions(east = open_bc, west = open_bc)
 
