@@ -12,12 +12,12 @@ Ny = 1800
 Nz = 40
 
 depth = 6000meters
-z_faces = exponential_z_faces(; Nz, depth)
+z = ExponentialDiscretization(Nz, -depth, 0)
 
 grid = LatitudeLongitudeGrid(arch;
                              size = (Nx, Ny, Nz),
                              halo = (7, 7, 7),
-                             z = z_faces,
+                             z,
                              latitude  = (-75, 75),
                              longitude = (0, 360))
 
@@ -74,7 +74,7 @@ simulation.callbacks[:progress] = Callback(progress, TimeInterval(5days))
 outputs = merge(ocean.model.tracers, ocean.model.velocities)
 ocean.output_writers[:surface] = JLD2Writer(ocean.model, outputs;
                                             schedule = TimeInterval(1days),
-				            filename = "near_global_surface_fields_$(arch.local_rank)",
+				                            filename = "near_global_surface_fields_$(arch.local_rank)",
                                             indices = (:, :, grid.Nz),
                                             with_halos = true,
                                             overwrite_existing = true,
