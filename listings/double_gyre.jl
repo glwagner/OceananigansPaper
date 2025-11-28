@@ -2,7 +2,6 @@ using Oceananigans
 using Oceananigans: WallTimeInterval
 using Oceananigans.Units
 using Oceananigans.TurbulenceClosures: CATKEVerticalDiffusivity
-using Oceananigans.Grids: ExponentialCoordinate
 using Printf
 using CUDA
 
@@ -11,7 +10,7 @@ Nx = 12 * 22
 Ny = 12 * 20
 Nz = 100
 Lz = 4000
-z_faces = ExponentialCoordinate(Nz, -Lz, 0; scale = Lz/5, bias = :right)
+z_faces(k) = - Lz * (1 + cos(π * (k - 1) / Nz)) / 2
 stop_time = 360days * 4
 
 grid = LatitudeLongitudeGrid(arch,
