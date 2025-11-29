@@ -2,7 +2,10 @@ using Oceananigans
 using Oceananigans: WallTimeInterval
 using Oceananigans.Units
 using Oceananigans.TurbulenceClosures: CATKEVerticalDiffusivity
+<<<<<<< HEAD
 using Oceananigans.Grids: ExponentialDiscretization
+=======
+>>>>>>> 9f77f3dfc29c4f75ad18b95b2f5ca9545d4e7c6a
 using Printf
 using CUDA
 
@@ -11,7 +14,11 @@ Nx = 12 #* 22   FJP change these back
 Ny = 12 #* 20
 Nz = 10 #0
 Lz = 4000
+<<<<<<< HEAD
 z_faces = ExponentialDiscretization(Nz, -Lz, 0; scale = Lz/5, bias = :right)
+=======
+z_faces(k) = - Lz * (1 + cos(π * (k - 1) / Nz)) / 2
+>>>>>>> 9f77f3dfc29c4f75ad18b95b2f5ca9545d4e7c6a
 stop_time = 360days * 4
 
 grid = LatitudeLongitudeGrid(arch,
