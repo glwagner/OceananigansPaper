@@ -2,16 +2,16 @@ using Oceananigans
 using Oceananigans: WallTimeInterval
 using Oceananigans.Units
 using Oceananigans.TurbulenceClosures: CATKEVerticalDiffusivity
-using Oceananigans.Grids: ExponentialCoordinate
+using Oceananigans.Grids: ExponentialDiscretization
 using Printf
 using CUDA
 
 arch = GPU()
-Nx = 12 * 22
-Ny = 12 * 20
-Nz = 100
+Nx = 12 #* 22   FJP change these back
+Ny = 12 #* 20
+Nz = 10 #0
 Lz = 4000
-z_faces = ExponentialCoordinate(Nz, -Lz, 0; scale = Lz/5, bias = :right)
+z_faces = ExponentialDiscretization(Nz, -Lz, 0; scale = Lz/5, bias = :right)
 stop_time = 360days * 4
 
 grid = LatitudeLongitudeGrid(arch,
@@ -66,7 +66,7 @@ add_callback!(simulation, progress, IterationInterval(100))
 e = model.tracers.e
 b = model.tracers.b
 u, v, w = model.velocities
-κc = model.diffusivity_fields.κc
+κc = model.closure_fields.κc
 outputs = (; u, v, w, b, e, κc)
 
 Nx, Ny, Nz = size(grid)
