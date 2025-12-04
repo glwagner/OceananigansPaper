@@ -2,7 +2,7 @@ using Oceananigans
 using Oceananigans: WallTimeInterval
 using Oceananigans.Units
 using Oceananigans.TurbulenceClosures: CATKEVerticalDiffusivity
-using Oceananigans.Grids: ExponentialDiscretization
+using Oceananigans.Grids: ExponentialDiscretization, φnode
 using Printf
 using CUDA
 
@@ -32,10 +32,18 @@ grid = ImmersedBoundaryGrid(grid, PartialCellBottom(bottom_height))
 u_top_bc = FluxBoundaryCondition(τx, parameters=2e-4)
 u_bcs = FieldBoundaryConditions(top=u_top_bc)
 
+b_parameters = (ω = 1/1days, Δb = 0.2)
+
 @inline b★(φ, p) = - p.Δb * sin(π/2 * (φ - 30) / 20)
-@inline b_restoring(λ, φ, t, b, p) = p.ω * (b - b★(φ, p))
-b_top_bc = FluxBoundaryCondition(b_restoring, field_dependencies=:b, parameters=(ω=1/1days, Δb=0.2))
-b_bcs = FieldBoundaryConditions(top=b_top_bc)
+@inline function b_restoring(i, j, grid, clock, fields, p)
+    φ = φnode(j, grid, Center())
+    b = @inbounds fields.b[i, j, grid.Nz]
+    return p.ω * (b - b★(φ, p))
+end
+b_top_bc = FluxBoundaryCondition(b_restoring;
+                                 discrete_form = true,
+                                 parameters = b_parameters)
+b_bcs = FieldBoundaryConditions(top = b_top_bc)
 
 model = HydrostaticFreeSurfaceModel(; grid,
                                     coriolis = HydrostaticSphericalCoriolis(),
@@ -44,7 +52,7 @@ model = HydrostaticFreeSurfaceModel(; grid,
                                     closure = CATKEVerticalDiffusivity(),
                                     tracers = (:b, :e),
                                     buoyancy = BuoyancyTracer(),
-                                    boundary_conditions = (u=u_bcs, b=b_bcs))
+                                    boundary_conditions = (u=u_bcs, b = b_bcs))
 
 N² = 2e-5
 bᵢ(x, y, z) = N² * z
