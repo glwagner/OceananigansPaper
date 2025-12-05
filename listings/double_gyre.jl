@@ -74,7 +74,7 @@ add_callback!(simulation, progress, IterationInterval(100))
 e = model.tracers.e
 b = model.tracers.b
 u, v, w = model.velocities
-κc = model.diffusivity_fields.κc
+κc = model.closure_fields.κc
 outputs = (; u, v, w, b, e, κc)
 
 Nx, Ny, Nz = size(grid)
