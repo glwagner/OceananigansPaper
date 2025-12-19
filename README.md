@@ -2,7 +2,7 @@
 
 Scripts that showcase Oceananigans syntax, physics, and performance in a paper about Oceananigans:
 
-> Wagner, G. L., Silvestri, S., Constantinou, N. C., Ramadhan, A., Campin, J.-M., Hill, C., Chor, T., Strong-Wright, J., Lee, X. K., Poulin, F., Marshall, J., and Ferrari, R. (2025). High-level, high-resolution ocean modeling at all scales with Oceananigans. J. Adv. Model. Earth Sy. (submitted on Feb 2025; preprint at [arXiv.2502.14148](https://doi.org/10.48550/arXiv.2502.14148))
+> Wagner, G. L., Silvestri, S., Constantinou, N. C., Ramadhan, A., Campin, J.-M., Hill, C., Chor, T., Strong-Wright, J., Lee, X. K., Poulin, F., Souza, A., Burns, K. J., Bishnu, S., Marshall, J., and Ferrari, R. (2025). High-level, high-resolution ocean modeling at all scales with Oceananigans. J. Adv. Model. Earth Sy. (submitted on Feb 2025; resubmitted on Nov 2025; preprint at [arXiv.2502.14148](https://doi.org/10.48550/arXiv.2502.14148))
 
 ## Contents
 
@@ -14,5 +14,3 @@ Scripts that showcase Oceananigans syntax, physics, and performance in a paper a
 * `figures`: These scripts are used to generate the figures / visualizations in the paper.
 
 * `sandbox`: For playing around.
-
-
