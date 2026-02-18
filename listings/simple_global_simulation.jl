@@ -1,6 +1,6 @@
 using Oceananigans
 using Oceananigans.Units
-import ClimaOcean
+import NumericalEarth
 using Dates
 using CFTime
 
@@ -14,17 +14,17 @@ grid = LatitudeLongitudeGrid(arch; z,
                              longitude = (0, 360),
                              latitude = (-70, 70))
 
-bathymetry = ClimaOcean.regrid_bathymetry(grid) # ETOPO1 bathymetry
+bathymetry = NumericalEarth.regrid_bathymetry(grid) # ETOPO1 bathymetry
 grid = ImmersedBoundaryGrid(grid, GridFittedBottom(bathymetry))
 
-ocean = ClimaOcean.ocean_simulation(grid)
+ocean = NumericalEarth.ocean_simulation(grid)
 dates = DateTimeProlepticGregorian(1993, 1, 1)
-set!(ocean.model, T = ClimaOcean.ECCOMetadatum(:temperature; date=dates),
-                  S = ClimaOcean.ECCOMetadatum(:salinity; date=dates))
+set!(ocean.model, T = NumericalEarth.ECCOMetadatum(:temperature; date=dates),
+                  S = NumericalEarth.ECCOMetadatum(:salinity; date=dates))
 
 # Force OceanSeaIceModel with JRA55 reanalysis
-atmosphere = ClimaOcean.JRA55PrescribedAtmosphere(arch)
-coupled_model = ClimaOcean.OceanSeaIceModel(ocean; atmosphere)
+atmosphere = NumericalEarth.JRA55PrescribedAtmosphere(arch)
+coupled_model = NumericalEarth.OceanSeaIceModel(ocean; atmosphere)
 simulation = Simulation(coupled_model, Δt=5minutes, stop_time=360days)
 
 using Printf
