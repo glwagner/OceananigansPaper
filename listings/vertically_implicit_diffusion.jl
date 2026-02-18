@@ -18,7 +18,7 @@ for (Δt, time_discretization) in [(0.5,  ExplicitTimeDiscretization()),
     κ(z, t) = abs(z) < 1
     closure = VerticalScalarDiffusivity(time_discretization; κ)
 
-    model = HydrostaticFreeSurfaceModel(; grid, closure, tracers=:c,
+    model = HydrostaticFreeSurfaceModel(grid; closure, tracers=:c,
                                         velocities=PrescribedVelocityFields())
 
     cᵢ(z) = z

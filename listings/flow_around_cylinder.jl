@@ -1,6 +1,5 @@
 using Oceananigans
 using Oceananigans.Models.NonhydrostaticModels: ConjugateGradientPoissonSolver
-using Oceananigans.Models.NonhydrostaticModels: DiagonallyDominantPreconditioner
 using Oceananigans.Operators: ℑxyᶠᶜᵃ, ℑxyᶜᶠᵃ
 using Oceananigans.Solvers: FFTBasedPoissonSolver
 using Printf
@@ -84,7 +83,6 @@ for Re in [Inf]
     v_sponge = Relaxation(target=0; mask, rate)
     forcing = (u=u_sponge, v=v_sponge)
 
-    ddp = DiagonallyDominantPreconditioner()
     preconditioner = FFTBasedPoissonSolver(reduced_precision_grid)
     reltol = abstol = 1e-7
     pressure_solver = ConjugateGradientPoissonSolver(grid, maxiter=10;
@@ -98,7 +96,7 @@ for Re in [Inf]
         prefix *= "_fft"
     end
 
-    model = NonhydrostaticModel(; grid, pressure_solver, closure,
+    model = NonhydrostaticModel(grid; pressure_solver, closure,
                                 advection, forcing, boundary_conditions)
 
     @show model

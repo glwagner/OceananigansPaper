@@ -5,7 +5,8 @@ using Dates
 using CFTime
 
 Nz = 40
-z = ClimaOcean.exponential_z_faces(; Nz, depth=5000)
+exponential_z_faces(; Nz, depth) = -depth * (1 .- (0:Nz) / Nz).^2
+z = exponential_z_faces(; Nz, depth=5000)
 arch = GPU()
 grid = LatitudeLongitudeGrid(arch; z,
                              size = (1440, 560, Nz),
@@ -18,11 +19,11 @@ grid = ImmersedBoundaryGrid(grid, GridFittedBottom(bathymetry))
 
 ocean = ClimaOcean.ocean_simulation(grid)
 dates = DateTimeProlepticGregorian(1993, 1, 1)
-set!(ocean.model, T = ClimaOcean.ECCOMetadata(:temperature; dates),
-                  S = ClimaOcean.ECCOMetadata(:salinity; dates))
+set!(ocean.model, T = ClimaOcean.ECCOMetadatum(:temperature; date=dates),
+                  S = ClimaOcean.ECCOMetadatum(:salinity; date=dates))
 
 # Force OceanSeaIceModel with JRA55 reanalysis
-atmosphere = ClimaOcean.JRA55_prescribed_atmosphere(arch)
+atmosphere = ClimaOcean.JRA55PrescribedAtmosphere(arch)
 coupled_model = ClimaOcean.OceanSeaIceModel(ocean; atmosphere)
 simulation = Simulation(coupled_model, Δt=5minutes, stop_time=360days)
 

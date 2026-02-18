@@ -64,7 +64,7 @@ coriolis = HydrostaticSphericalCoriolis()
 buoyancy = SeawaterBuoyancy(equation_of_state=TEOS10EquationOfState())
 free_surface = SplitExplicitFreeSurface(grid, substeps=60)
 
-model = HydrostaticFreeSurfaceModel(; grid, coriolis, free_surface,
+model = HydrostaticFreeSurfaceModel(grid; coriolis, free_surface,
                                       buoyancy, tracers=(:T, :S),
                                       momentum_advection, tracer_advection)
 

@@ -27,7 +27,7 @@ grid = ImmersedBoundaryGrid(grid, GridFittedBottom(bottom))
 T₂ = 12.421hours # period of M₂ tide constituent
 u_forcing = Forcing(tidal_forcing, parameters=(; U₂=0.1, T₂=T₂))
 
-model = HydrostaticFreeSurfaceModel(; grid, tracers=:b, buoyancy=BuoyancyTracer(),
+model = HydrostaticFreeSurfaceModel(grid; tracers=:b, buoyancy=BuoyancyTracer(),
                                       momentum_advection = WENO(),
                                       tracer_advection = WENO(),
                                       forcing = (; u = u_forcing))

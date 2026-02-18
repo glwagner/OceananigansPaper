@@ -16,7 +16,7 @@ end
                        
 # Build a model with the "Weighted Essentially Non-Oscillatory" (WENO)
 # advection scheme, which introduces implicit numerical diffusion.
-model = NonhydrostaticModel(; grid, advection=WENO(),
+model = NonhydrostaticModel(grid; advection=WENO(),
                             tracers=:c, forcing=(; c=circling_source))
 
 # Set a random initial condition and then run the simulation. 

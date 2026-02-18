@@ -12,7 +12,7 @@ function circling_source(x, y, t)
     return exp(-(dx^2 + dy^2) / 2δ^2)
 end
                        
-model = NonhydrostaticModel(; grid, advection=WENO(order=9),
+model = NonhydrostaticModel(grid; advection=WENO(order=9),
                             tracers=:c, forcing=(; c=circling_source))
 
                        
