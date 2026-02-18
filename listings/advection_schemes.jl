@@ -9,7 +9,7 @@ function advect_tracer(tracer_advection; closure=nothing, Nx=128, stop_time=1)
     grid = RectilinearGrid(size=Nx, x=(-4, 8), halo=6, topology=(Periodic, Flat, Flat))
 
     velocities = PrescribedVelocityFields(u=1)
-    model = HydrostaticFreeSurfaceModel(; grid, closure, velocities,
+    model = HydrostaticFreeSurfaceModel(grid; closure, velocities,
                                         tracer_advection, tracers = :c)
 
     set!(model, c= x -> abs(x) > 1 ? 0 : 1)

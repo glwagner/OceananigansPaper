@@ -32,7 +32,7 @@ T_bcs = FieldBoundaryConditions(east = ambient_temperature_bc, west = ambient_te
 ambient_salinity_bc = ValueBoundaryCondition(32)
 S_bcs = FieldBoundaryConditions(east = ambient_salinity_bc, west = ambient_salinity_bc)
 
-model = NonhydrostaticModel(; grid, tracers = (:T, :S),
+model = NonhydrostaticModel(grid; tracers = (:T, :S),
                               buoyancy = SeawaterBuoyancy(equation_of_state=TEOS10EquationOfState()),
                               advection = WENO(order=9), coriolis = FPlane(latitude=47.5),
                               boundary_conditions = (; T=T_bcs, u = u_bcs, S = S_bcs))

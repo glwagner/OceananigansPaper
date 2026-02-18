@@ -2,7 +2,7 @@ using Oceananigans
 
 grid = RectilinearGrid(size=64, x=(-4, 8), topology=(Periodic, Flat, Flat)) 
 
-model = NonhydrostaticModel(grid=grid, tracers=:c, advection=WENO(order=5))
+model = NonhydrostaticModel(grid; tracers=:c, advection=WENO(order=5))
 cᵢ(x) = exp(-x^2 / 2)
 set!(model, u=1, c=cᵢ)
 

@@ -13,15 +13,9 @@ function run_vertical_mixing_simulation(closure)
 
     u_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(τx))
 
-    if closure isa CATKEVerticalDiffusivity
-        tracers = (:b, :e)
-    elseif closure isa TKEDissipationVerticalDiffusivity
-        tracers = (:b, :e, :ϵ)
-    else
-        tracers = :b
-    end
+    tracers = :b
 
-    model = HydrostaticFreeSurfaceModel(; grid, closure, tracers,
+    model = HydrostaticFreeSurfaceModel(grid; closure, tracers,
                                         boundary_conditions = (; u=u_bcs),
                                         buoyancy = BuoyancyTracer())
 

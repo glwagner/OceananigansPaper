@@ -27,7 +27,7 @@ parameters = (; Λ, f)
 background_fields = (u = BackgroundField(uᵇᵍ; parameters),
                      b = BackgroundField(bᵇᵍ; parameters))
 
-model = NonhydrostaticModel(; grid, background_fields,
+model = NonhydrostaticModel(grid; background_fields,
                             coriolis = FPlane(; f),
                             tracers = :b,
                             buoyancy = BuoyancyTracer(),

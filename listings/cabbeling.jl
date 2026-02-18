@@ -15,7 +15,7 @@ buoyancy = SeawaterBuoyancy(; equation_of_state,
                             constant_salinity = 0,
                             gravitational_acceleration = 9.81) 
 
-model = NonhydrostaticModel(; grid, buoyancy, closure, tracers=:T, timestepper=:RungeKutta3)
+model = NonhydrostaticModel(grid; buoyancy, closure, tracers=:T, timestepper=:RungeKutta3)
                             
 T₁, T₂ = 1, 7.55 # ᵒC
 Tᵢ(x, z) = z <= -0.25 ? T₁ : T₂
