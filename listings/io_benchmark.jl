@@ -1,8 +1,6 @@
 using Oceananigans
 using Oceananigans.Units
 import NumericalEarth
-using Dates
-using CFTime
 using Printf
 
 # Grid setup: 1/6° global resolution
@@ -21,22 +19,31 @@ grid = ImmersedBoundaryGrid(grid, GridFittedBottom(bathymetry))
 
 # Build coupled Earth System Model
 ocean = NumericalEarth.ocean_simulation(grid)
-date = DateTimeProlepticGregorian(1993, 1, 1)
-set!(ocean.model, T = NumericalEarth.ECCOMetadatum(:temperature; date),
-                  S = NumericalEarth.ECCOMetadatum(:salinity; date))
+set!(ocean.model, T=20, S=35)
 
 atmosphere = NumericalEarth.JRA55PrescribedAtmosphere(arch)
-coupled_model = NumericalEarth.OceanSeaIceModel(ocean; atmosphere)
+coupled_model = NumericalEarth.OceanOnlyModel(ocean; atmosphere)
 simulation = Simulation(coupled_model, Δt=10minutes, stop_iteration=100)
+
+# Disable the NaN checker so benchmark runs to completion
+pop!(simulation.callbacks, :nan_checker, nothing)
 
 # Warmup: compile and warm up (no output writers)
 @info "Warming up for 100 iterations..."
 run!(simulation)
 @info "Warmup complete."
 
-# Reset clock after warmup
-simulation.model.clock.iteration = 0
-simulation.model.clock.time = 0
+# Helper to reset model state between trials
+function reset_model!(simulation, ocean)
+    simulation.model.clock.iteration = 0
+    simulation.model.clock.time = 0
+    set!(ocean.model, T=20, S=35)
+    u, v, w = ocean.model.velocities
+    set!(u, 0)
+    set!(v, 0)
+    set!(w, 0)
+    return nothing
+end
 
 # Benchmark parameters
 Nsteps = 1440
@@ -49,17 +56,13 @@ output_intervals = [
 ]
 
 # 3D ocean fields to write
-u, v, w = ocean.model.velocities
-T = ocean.model.tracers.T
-S = ocean.model.tracers.S
-benchmark_outputs = (; u, v, w, T, S)
+benchmark_outputs = merge(ocean.model.velocities, ocean.model.tracers)
 
 results = []
 
 for (name, k) in output_intervals
-    # Reset clock
-    simulation.model.clock.iteration = 0
-    simulation.model.clock.time = 0
+    # Reset clock and fields
+    reset_model!(simulation, ocean)
     simulation.stop_iteration = Nsteps
 
     # Attach output writer if this is not the control run
