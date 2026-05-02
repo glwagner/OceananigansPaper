@@ -38,9 +38,11 @@ end
 
 add_callback!(simulation, print_progress, IterationInterval(10))
 
+include(joinpath(@__DIR__, "_smoke_prelude.jl")); smoke_test_simulation!(simulation)
 run!(simulation)
 c = deepcopy(model.tracers.c)
 simulation.stop_time = 10
+smoke_test_simulation!(simulation)
 run!(simulation)
 
 # Visualize the resulting vorticity field.

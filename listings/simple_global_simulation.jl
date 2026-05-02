@@ -3,6 +3,7 @@ using Oceananigans.Units
 import NumericalEarth
 using Dates
 using CFTime
+using CUDA
 
 Nz = 40
 exponential_z_faces(; Nz, depth) = -depth * (1 .- (0:Nz) / Nz).^2
@@ -24,7 +25,8 @@ set!(ocean.model, T = NumericalEarth.ECCOMetadatum(:temperature; date=dates),
 
 # Force OceanSeaIceModel with JRA55 reanalysis
 atmosphere = NumericalEarth.JRA55PrescribedAtmosphere(arch)
-coupled_model = NumericalEarth.OceanSeaIceModel(ocean; atmosphere)
+sea_ice = NumericalEarth.sea_ice_simulation(grid, ocean)
+coupled_model = NumericalEarth.OceanSeaIceModel(ocean, sea_ice; atmosphere)
 simulation = Simulation(coupled_model, Δt=5minutes, stop_time=360days)
 
 using Printf
@@ -69,5 +71,6 @@ checkpointer = Checkpointer(ocean.model,
 simulation.output_writers[:surface] = writer
 simulation.output_writers[:chk] = checkpointer
 
+include(joinpath(@__DIR__, "_smoke_prelude.jl")); smoke_test_simulation!(simulation)
 run!(simulation)
 

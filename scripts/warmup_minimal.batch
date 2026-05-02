@@ -1,0 +1,51 @@
+#!/bin/bash
+#SBATCH --job-name=warmup-min
+#SBATCH --output=scripts/logs/warmup-min-%j.log
+#SBATCH --time=01:00:00
+#SBATCH --nodes=1
+#SBATCH --partition=gpu-dev
+#SBATCH --gres=gpu:1
+
+set -euo pipefail
+export PATH="$HOME/.juliaup/bin:$PATH"
+# Build a portable multitarget cache that works on both Intel (g4dn, p5) and AMD nodes.
+export JULIA_CPU_TARGET="generic"
+hostname; date
+nvidia-smi --query-gpu=name --format=csv,noheader || true
+cd /shared/home/greg/Projects/OceananigansPaper
+echo
+
+# Pipe stdout/stderr line-buffered so we see progress live.
+stdbuf -oL -eL julia --project -e '
+using Printf
+print("[", time(), "] using Oceananigans..."); flush(stdout)
+using Oceananigans
+println(" OK"); flush(stdout)
+print("[", time(), "] using CUDA..."); flush(stdout)
+using CUDA
+println(" OK functional=", CUDA.functional()); flush(stdout)
+print("[", time(), "] using MPI..."); flush(stdout)
+using MPI
+println(" OK"); flush(stdout)
+print("[", time(), "] tiny GPU sim..."); flush(stdout)
+g = RectilinearGrid(GPU(), size=(8,8,4), extent=(1,1,1))
+m = NonhydrostaticModel(g)
+sim = Simulation(m, Δt=0.001, stop_iteration=3)
+run!(sim)
+println(" OK iter=", m.clock.iteration); flush(stdout)
+print("[", time(), "] using NumericalEarth..."); flush(stdout)
+import NumericalEarth
+println(" OK"); flush(stdout)
+print("[", time(), "] using ClimaSeaIce..."); flush(stdout)
+using ClimaSeaIce
+println(" OK"); flush(stdout)
+print("[", time(), "] using Oceanostics..."); flush(stdout)
+using Oceanostics
+println(" OK"); flush(stdout)
+print("[", time(), "] using CairoMakie..."); flush(stdout)
+using CairoMakie
+println(" OK"); flush(stdout)
+println("[", time(), "] WARMUP DONE")
+'
+echo
+echo "=== END ==="; date

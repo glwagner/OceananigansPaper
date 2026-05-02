@@ -1,0 +1,37 @@
+#!/bin/bash
+#SBATCH --job-name=bench
+#SBATCH --output=scripts/logs/bench-%x-%j.log
+#SBATCH --time=02:00:00
+#SBATCH --nodes=1
+#SBATCH --partition=gpu-prod
+#SBATCH --gres=gpu:h100:1
+
+# Generic SYPD-benchmark wrapper. Set BENCH_FILE=benchmarks/<name>.jl.
+# Sources ECCO creds from ~/.secrets/ecco.env if present (needed for global sim).
+
+set -euo pipefail
+export PATH="$HOME/.juliaup/bin:$PATH"
+export JULIA_CPU_TARGET="generic"
+
+BENCH_FILE="${BENCH_FILE:?must set BENCH_FILE=benchmarks/<name>.jl}"
+
+if [ -f "$HOME/.secrets/ecco.env" ]; then
+  set +x
+  source "$HOME/.secrets/ecco.env"
+  echo "Loaded ECCO creds for user=${ECCO_USERNAME:-unset}"
+fi
+
+echo "=== Benchmark: $BENCH_FILE ==="
+hostname; date
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+echo
+
+cd /shared/home/greg/Projects/OceananigansPaper
+
+julia --project "$BENCH_FILE"
+RC=$?
+
+echo
+echo "=== DONE rc=$RC ==="
+date
+exit $RC

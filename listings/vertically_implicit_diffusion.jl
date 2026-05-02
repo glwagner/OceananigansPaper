@@ -25,6 +25,7 @@ for (Δt, time_discretization) in [(0.5,  ExplicitTimeDiscretization()),
     set!(model, c=cᵢ)
 
     simulation = Simulation(model; Δt, stop_time=0.5)
+    include(joinpath(@__DIR__, "_smoke_prelude.jl")); smoke_test_simulation!(simulation)
     run!(simulation)
     label = string(summary(time_discretization), ", Δt=", Δt)
     lines!(axc, model.tracers.c; label)
