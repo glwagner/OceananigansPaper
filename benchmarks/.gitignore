@@ -1,0 +1,4 @@
+package-update.log
+runs/
+smoke/
+*.tmp
