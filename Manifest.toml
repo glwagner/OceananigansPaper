@@ -1621,9 +1621,11 @@ version = "0.5.5"
 
 [[deps.Oceananigans]]
 deps = ["Adapt", "Crayons", "CubedSphere", "Dates", "Distances", "DocStringExtensions", "FFTW", "GPUArraysCore", "Glob", "InteractiveUtils", "JLD2", "KernelAbstractions", "Krylov", "LinearAlgebra", "Logging", "MPI", "MuladdMacro", "OffsetArrays", "OrderedCollections", "Pkg", "Printf", "ReactantCore", "Rotations", "SeawaterPolynomials", "SparseArrays", "StaticArrays", "Statistics", "StructArrays"]
-git-tree-sha1 = "9e4c315868cc6b0d55a673309c572a34e52ecc2b"
+git-tree-sha1 = "1aa4a34296444643350194906fbefb0c14b4764d"
+repo-rev = "reinstate-enum-bias"
+repo-url = "https://github.com/CliMA/Oceananigans.jl"
 uuid = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
-version = "0.107.4"
+version = "0.107.5"
 
     [deps.Oceananigans.extensions]
     OceananigansAMDGPUExt = ["AMDGPU", "AbstractFFTs"]
