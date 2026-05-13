@@ -62,16 +62,28 @@ set!(model, b=bᵢ)
 simulation = Simulation(model, Δt=initial_dt)
 conjure_time_step_wizard!(simulation; cfl, max_Δt=max_dt)
 
-# Progress callback so the spinup phase is visible in the slurm log and so the
-# timed phase prints the equilibrated Δt the wizard converged on.
-wallclock = Ref(time_ns())
+# Progress callback. Reports an *instantaneous* SYPD over each 100-iter window
+# so we can watch the wizard's Δt — and therefore SYPD — equilibrate during
+# spinup rather than waiting until measure_sypd!'s timed window at the very
+# end to find out whether it stabilized.
+wallclock      = Ref(time_ns())
+prev_sim_time  = Ref(simulation.model.clock.time)
+prev_iteration = Ref(simulation.model.clock.iteration)
 function progress(sim)
-    elapsed = 1e-9 * (time_ns() - wallclock[])
+    now_wall   = time_ns()
+    Δwall      = 1e-9 * (now_wall - wallclock[])
+    Δsim_sec   = sim.model.clock.time      - prev_sim_time[]
+    Δiter      = sim.model.clock.iteration - prev_iteration[]
+    sypd_inst  = Δwall > 0 ? Δsim_sec / (Δwall * 365.25) : NaN
+    sec_per_it = Δiter > 0 ? Δwall / Δiter : NaN
     u, v, w = sim.model.velocities
-    @info @sprintf("iter %d, t = %s, Δt = %s, wall = %.2f s, max|u,v,w| = (%.3f, %.3f, %.3f) m/s",
-                   iteration(sim), prettytime(sim), prettytime(sim.Δt), elapsed,
+    @info @sprintf("iter %d, t = %s, Δt = %s, wall = %.2f s, sec/iter = %.3f, SYPD ≈ %.4f, max|u,v,w| = (%.3f, %.3f, %.3f) m/s",
+                   iteration(sim), prettytime(sim), prettytime(sim.Δt),
+                   Δwall, sec_per_it, sypd_inst,
                    maximum(abs, u), maximum(abs, v), maximum(abs, w))
-    wallclock[] = time_ns()
+    wallclock[]      = now_wall
+    prev_sim_time[]  = sim.model.clock.time
+    prev_iteration[] = sim.model.clock.iteration
     return nothing
 end
 add_callback!(simulation, progress, IterationInterval(100))
