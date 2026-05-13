@@ -1,0 +1,25 @@
+#!/bin/bash
+#SBATCH --job-name=smoke-cpu
+#SBATCH --output=scripts/logs/smoke-%x-%j.log
+#SBATCH --time=00:20:00
+#SBATCH --nodes=1
+#SBATCH --partition=cpu
+#SBATCH --ntasks=1
+
+set -euo pipefail
+export PATH="$HOME/.juliaup/bin:$PATH"
+export JULIA_CPU_TARGET="generic"
+export OCEANANIGANS_PAPER_SMOKE=1
+export OCEANANIGANS_PAPER_SMOKE_ITERS=${OCEANANIGANS_PAPER_SMOKE_ITERS:-10}
+
+LISTING="${LISTING:?must set LISTING env var}"
+
+echo "=== CPU smoke: $LISTING ==="
+hostname; date
+cd /shared/home/greg/Projects/OceananigansPaper
+julia --project "$LISTING"
+rc=$?
+echo
+echo "=== EXIT $rc ==="
+date
+exit $rc

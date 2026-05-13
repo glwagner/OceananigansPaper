@@ -1,0 +1,27 @@
+#!/bin/bash
+#SBATCH --job-name=eady-30d
+#SBATCH --output=scripts/logs/eady-30d-%j.log
+#SBATCH --time=04:00:00
+#SBATCH --nodes=1
+#SBATCH --partition=gpu-prod
+#SBATCH --nodelist=gpu-prod-st-gpu-prod-2
+#SBATCH --gres=gpu:1
+
+# Eady LES benchmark at the paper's stated config (1000×1000×64, WENO(9), 30 days).
+# Runs on the idle gpu-prod-2 node (single H100). Produces benchmarks/runs/eady_les_<jobid>.json.
+
+set -euo pipefail
+export PATH="$HOME/.juliaup/bin:$PATH"
+export JULIA_CPU_TARGET="generic"
+
+echo "=== Eady LES benchmark ==="
+hostname; date
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+echo
+
+cd /shared/home/greg/Projects/OceananigansPaper
+
+julia --project benchmarks/eady_les_30d.jl
+
+echo
+echo "=== DONE ==="; date

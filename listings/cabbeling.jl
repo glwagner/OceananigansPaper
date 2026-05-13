@@ -1,6 +1,7 @@
 using Oceananigans
 using Oceananigans.Models: seawater_density
 using SeawaterPolynomials: TEOS10EquationOfState
+using CUDA
 
 grid = RectilinearGrid(GPU(),
                        size = (4096, 1024),
@@ -44,6 +45,7 @@ output_writer = JLD2Writer(model, (; ρ, T),
                                         
 simulation.output_writers[:jld2] = output_writer
 
+include(joinpath(@__DIR__, "_smoke_prelude.jl")); smoke_test_simulation!(simulation)
 run!(simulation)
 
 #=

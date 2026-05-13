@@ -1,0 +1,63 @@
+#!/bin/bash
+#SBATCH --job-name=gpu-smoke
+#SBATCH --output=scripts/logs/gpu-smoke-%j.log
+#SBATCH --time=00:30:00
+#SBATCH --nodes=1
+#SBATCH --partition=gpu-dev
+#SBATCH --gres=gpu:1
+
+set -euo pipefail
+export PATH="$HOME/.juliaup/bin:$PATH"
+
+echo "=== Host & GPU ==="
+hostname
+date
+nvidia-smi || true
+echo
+
+echo "=== Julia ==="
+julia --version
+echo
+
+cd /shared/home/greg/Projects/OceananigansPaper
+
+echo "=== CUDA versioninfo ==="
+julia --project -e '
+using CUDA
+CUDA.versioninfo()
+println()
+println("CUDA functional: ", CUDA.functional())
+println("Devices: ", length(CUDA.devices()))
+'
+echo
+
+echo "=== MPI versioninfo ==="
+julia --project -e '
+using MPI
+MPI.versioninfo()
+'
+echo
+
+echo "=== Tiny Oceananigans GPU kernel ==="
+julia --project -e '
+using Oceananigans
+using CUDA
+arch = GPU()
+grid = RectilinearGrid(arch, size=(32, 32, 8), extent=(1, 1, 1))
+println("Grid: ", grid)
+model = NonhydrostaticModel(; grid)
+set!(model, u=(x,y,z) -> sin(2π*x)*cos(2π*y))
+u_max = maximum(abs, model.velocities.u)
+println("max|u| after set: ", u_max)
+simulation = Simulation(model; Δt=1e-3, stop_iteration=10)
+run!(simulation)
+u_max2 = maximum(abs, model.velocities.u)
+println("max|u| after 10 iters: ", u_max2)
+println("Iteration: ", model.clock.iteration)
+println("Time: ", model.clock.time)
+println("OK")
+'
+
+echo
+echo "=== DONE ==="
+date

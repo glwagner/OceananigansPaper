@@ -171,7 +171,8 @@ for Re in [Inf]
                                                   filename = prefix * "_drag.jld2",
                                                   overwrite_existing = true,
                                                   with_halos = true)
-     
+
+    include(joinpath(@__DIR__, "_smoke_prelude.jl")); smoke_test_simulation!(simulation)
     run!(simulation)
 end
 

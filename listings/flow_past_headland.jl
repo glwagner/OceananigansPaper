@@ -1,6 +1,7 @@
 using Oceananigans
 using Oceananigans.Units
 using SeawaterPolynomials: TEOS10EquationOfState
+using CUDA
 
 H, L = 256meters, 1024meters
 δ = L / 2
@@ -67,8 +68,7 @@ u, v, w = model.velocities
 ζ = ∂x(v) - ∂y(u)
 
 using Oceanostics: ErtelPotentialVorticity
-using Oceananigans.BuoyancyFormulations: buoyancy
-q = Field(ErtelPotentialVorticity(model, model.velocities..., buoyancy(model), model.coriolis))
+q = Field(ErtelPotentialVorticity(model; tracer_name=:T))
 outputs = merge(model.velocities, model.tracers, (; ζ, q))
 
 xy_writer = JLD2Writer(model, outputs,
@@ -92,4 +92,5 @@ simulation.output_writers[:xy] = xy_writer
 simulation.output_writers[:xz] = xz_writer
 simulation.output_writers[:xyz] = xyz_writer
 
+include(joinpath(@__DIR__, "_smoke_prelude.jl")); smoke_test_simulation!(simulation)
 run!(simulation)

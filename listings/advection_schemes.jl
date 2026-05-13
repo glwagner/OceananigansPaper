@@ -14,6 +14,7 @@ function advect_tracer(tracer_advection; closure=nothing, Nx=128, stop_time=1)
 
     set!(model, c= x -> abs(x) > 1 ? 0 : 1)
     simulation = Simulation(model; Δt=0.1/Nx, stop_time)
+    include(joinpath(@__DIR__, "_smoke_prelude.jl")); smoke_test_simulation!(simulation)
     run!(simulation)
     return model.tracers.c
 end

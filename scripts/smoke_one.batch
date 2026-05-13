@@ -1,0 +1,31 @@
+#!/bin/bash
+#SBATCH --job-name=smoke
+#SBATCH --output=scripts/logs/smoke-%x-%j.log
+#SBATCH --time=00:20:00
+#SBATCH --nodes=1
+#SBATCH --partition=gpu-dev
+#SBATCH --gres=gpu:1
+
+set -euo pipefail
+export PATH="$HOME/.juliaup/bin:$PATH"
+export JULIA_CPU_TARGET="generic"
+export OCEANANIGANS_PAPER_SMOKE=1
+export OCEANANIGANS_PAPER_SMOKE_ITERS=${OCEANANIGANS_PAPER_SMOKE_ITERS:-10}
+[ -f "$HOME/.secrets/ecco.env" ] && source "$HOME/.secrets/ecco.env"
+
+LISTING="${LISTING:?must set LISTING env var to listings/<name>.jl}"
+
+echo "=== Smoke test: $LISTING ==="
+hostname; date
+nvidia-smi --query-gpu=name --format=csv,noheader || true
+echo
+
+cd /shared/home/greg/Projects/OceananigansPaper
+
+julia --project "$LISTING"
+rc=$?
+
+echo
+echo "=== EXIT $rc ==="
+date
+exit $rc

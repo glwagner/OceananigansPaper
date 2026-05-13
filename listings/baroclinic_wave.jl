@@ -9,8 +9,8 @@ using CUDA
 
 # grid_type = "lat_lon"
 # grid_type = "rotated_lat_lon"
-# grid_type = "tripolar"
 # grid_type = "cubed_sphere"
+@isdefined(grid_type) || (grid_type = "tripolar")
 
 arch = GPU()
 #resolution = 1
@@ -111,5 +111,6 @@ ow = JLD2Writer(model, fields,
 
 simulation.output_writers[:surface] = ow
 
+include(joinpath(@__DIR__, "_smoke_prelude.jl")); smoke_test_simulation!(simulation)
 run!(simulation)
 

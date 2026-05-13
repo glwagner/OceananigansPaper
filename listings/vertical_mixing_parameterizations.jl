@@ -23,6 +23,7 @@ function run_vertical_mixing_simulation(closure)
     set!(model, b=bᵢ)
 
     simulation = Simulation(model, Δt=10, stop_time=24hours)
+    include(joinpath(@__DIR__, "_smoke_prelude.jl")); smoke_test_simulation!(simulation)
     run!(simulation)
 
     return simulation

@@ -1,0 +1,66 @@
+#!/bin/bash
+#SBATCH --job-name=bench
+#SBATCH --output=scripts/logs/bench-%x-%j.log
+#SBATCH --time=08:00:00
+#SBATCH --nodes=1
+#SBATCH --partition=gpu-prod
+#SBATCH --nodelist=gpu-prod-st-gpu-prod-2
+#SBATCH --gres=gpu:1
+
+# Generic benchmark wrapper. Times running a single listing on gpu-prod-2.
+# Usage: LISTING=listings/foo.jl sbatch scripts/benchmark_listing.batch
+# Writes benchmarks/runs/<listing>_<jobid>.json summary.
+
+set -euo pipefail
+export PATH="$HOME/.juliaup/bin:$PATH"
+export JULIA_CPU_TARGET="generic"
+
+LISTING="${LISTING:?must set LISTING}"
+NAME=$(basename "$LISTING" .jl)
+
+echo "=== Benchmark: $LISTING ==="
+hostname; date
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+echo
+
+cd /shared/home/greg/Projects/OceananigansPaper
+mkdir -p benchmarks/runs
+
+GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
+GPU_MEM=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader | head -1)
+
+START_EPOCH=$(date +%s)
+START_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+# Run the listing; preserve exit code
+julia --project "$LISTING"
+RC=$?
+
+END_EPOCH=$(date +%s)
+END_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+WALL=$((END_EPOCH - START_EPOCH))
+
+JSON="benchmarks/runs/${NAME}_${SLURM_JOB_ID}.json"
+cat > "$JSON" <<EOF
+{
+  "listing": "$LISTING",
+  "name": "$NAME",
+  "exit_code": $RC,
+  "started": "$START_ISO",
+  "finished": "$END_ISO",
+  "wall_seconds": $WALL,
+  "hardware": {
+    "gpu": "$GPU_NAME",
+    "gpu_memory": "$GPU_MEM",
+    "n_gpus": 1,
+    "n_nodes": 1,
+    "slurm_jobid": "$SLURM_JOB_ID",
+    "slurm_nodelist": "$SLURM_JOB_NODELIST"
+  }
+}
+EOF
+
+echo "=== DONE rc=$RC, wall=${WALL}s ==="
+echo "Summary: $JSON"
+date
+exit $RC

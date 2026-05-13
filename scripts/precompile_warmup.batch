@@ -1,0 +1,57 @@
+#!/bin/bash
+#SBATCH --job-name=precompile-warmup
+#SBATCH --output=scripts/logs/precompile-warmup-%j.log
+#SBATCH --time=00:30:00
+#SBATCH --nodes=1
+#SBATCH --partition=gpu-dev
+#SBATCH --gres=gpu:1
+
+# Force-import every package the listings touch in a single Julia process
+# on a GPU node, so all GPU-conditional precompile happens once.
+# Subsequent parallel smoke jobs share the warmed cache via /shared.
+
+set -euo pipefail
+export PATH="$HOME/.juliaup/bin:$PATH"
+
+echo "=== Warmup ==="
+hostname; date
+nvidia-smi --query-gpu=name --format=csv,noheader || true
+echo
+
+cd /shared/home/greg/Projects/OceananigansPaper
+
+julia --project -e '
+import Pkg
+@info "Warming up: forcing using of every listing dep on GPU"
+using Oceananigans
+using Oceananigans.Units
+using Oceananigans.OrthogonalSphericalShellGrids: RotatedLatitudeLongitudeGrid
+using Oceananigans.Models.NonhydrostaticModels: ConjugateGradientPoissonSolver
+using Oceananigans.Operators
+using Oceananigans.Solvers: FFTBasedPoissonSolver
+using Oceananigans.BuoyancyFormulations: buoyancy
+import NumericalEarth
+using ClimaSeaIce
+using Oceanostics
+using Oceanostics: ErtelPotentialVorticity
+using SeawaterPolynomials
+using SeawaterPolynomials: TEOS10EquationOfState
+using CFTime
+using Dates
+using CUDA
+using MPI
+using CairoMakie
+using Printf
+using Random
+@info "All imports OK; running tiny GPU sim to force OceananigansCUDAExt compile"
+arch = GPU()
+g = RectilinearGrid(arch, size=(8,8,4), extent=(1,1,1))
+m = NonhydrostaticModel(g)
+sim = Simulation(m, Δt=0.001, stop_iteration=3)
+run!(sim)
+@info "WARMUP OK iteration=$(m.clock.iteration)"
+'
+
+echo
+echo "=== DONE ==="
+date

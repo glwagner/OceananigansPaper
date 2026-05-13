@@ -37,6 +37,7 @@ end
 
 add_callback!(simulation, print_progress, IterationInterval(10))
 
+include(joinpath(@__DIR__, "_smoke_prelude.jl")); smoke_test_simulation!(simulation)
 run!(simulation)
 
 using CairoMakie

@@ -1,0 +1,15 @@
+Status `~/Projects/OceananigansPaper/Project.toml`
+  [ab4f0b2a] BFloat16s v0.6.1
+  [179af706] CFTime v0.2.8
+  [052768ef] CUDA v6.1.0
+  [13f3f980] CairoMakie v0.15.10
+  [6ba0ff68] ClimaSeaIce v0.4.10
+  [e9467ef8] GLMakie v0.13.10
+  [da04e1cc] MPI v0.20.26
+  [3da0fdf6] MPIPreferences v0.1.12
+  [904d977b] NumericalEarth v0.3.0
+  [9e8cae18] Oceananigans v0.107.4
+  [d0ccf422] Oceanostics v0.16.12
+⌅ [f2b01f46] Roots v2.3.0
+  [d496a93d] SeawaterPolynomials v0.3.10
+Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading. To see why use `status --outdated`

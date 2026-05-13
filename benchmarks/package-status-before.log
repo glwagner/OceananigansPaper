@@ -1,0 +1,13 @@
+Status `~/Projects/OceananigansPaper/Project.toml`
+→⌃ [179af706] CFTime v0.2.5 (<v0.2.8)
+→⌅ [052768ef] CUDA v5.9.6 (<v6.1.0): NumericalEarth
+→⌃ [13f3f980] CairoMakie v0.15.8 (<v0.15.10)
+→⌃ [6ba0ff68] ClimaSeaIce v0.4.3 (<v0.4.10)
+→⌃ [e9467ef8] GLMakie v0.13.8 (<v0.13.10)
+→⌃ [da04e1cc] MPI v0.20.23 (<v0.20.26)
+ ⌃ [3da0fdf6] MPIPreferences v0.1.11 (<v0.1.12)
+→⌃ [904d977b] NumericalEarth v0.1.1 (<v0.3.0)
+→⌅ [9e8cae18] Oceananigans v0.104.5 (<v0.107.4): ClimaSeaIce, NumericalEarth, Oceanostics
+→⌃ [d0ccf422] Oceanostics v0.16.9 (<v0.16.12)
+→⌅ [f2b01f46] Roots v2.2.10 (<v3.0.0): ClimaSeaIce
+Info Packages marked with → are not downloaded, use `instantiate` to download

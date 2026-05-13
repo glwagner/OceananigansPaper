@@ -44,4 +44,5 @@ writer = JLD2Writer(model, merge(model.velocities, model.tracers),
 
 simulation.output_writers[:jld2] = writer
 
+include(joinpath(@__DIR__, "_smoke_prelude.jl")); smoke_test_simulation!(simulation)
 run!(simulation)

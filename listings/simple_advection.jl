@@ -10,6 +10,7 @@ using CairoMakie
 lines(model.tracers.c, label="Tracer at t=0")
 
 simulation = Simulation(model, Δt=0.01, stop_time=1)
+include(joinpath(@__DIR__, "_smoke_prelude.jl")); smoke_test_simulation!(simulation)
 run!(simulation)
 lines!(model.tracers.c, label="Tracer at t=1")
 

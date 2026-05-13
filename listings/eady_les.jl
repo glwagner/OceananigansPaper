@@ -1,6 +1,7 @@
 using Oceananigans
 using Oceananigans.Units
 using Printf
+using CUDA
 
 arch = GPU()
 x = y = (0, 4096)
@@ -55,6 +56,7 @@ end
 add_callback!(simulation, progress, IterationInterval(100))
 
 u, v, w = model.velocities
+b = model.tracers.b
 ζ = ∂x(v) - ∂y(u)
 s = @at (Center, Center, Center) sqrt(u^2 + v^2)
 ∇b² = @at (Center, Center, Center) ∂x(b)^2 + ∂y(b)^2
@@ -68,5 +70,6 @@ xy = JLD2Writer(model, outputs,
 
 simulation.output_writers[:xy] = xy
 
+include(joinpath(@__DIR__, "_smoke_prelude.jl")); smoke_test_simulation!(simulation)
 run!(simulation)
 
