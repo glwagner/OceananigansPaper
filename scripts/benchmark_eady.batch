@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=bench-eady
 #SBATCH --output=scripts/logs/bench-eady-%j.log
-#SBATCH --time=06:00:00
+#SBATCH --time=12:00:00
 #SBATCH --nodes=1
 #SBATCH --partition=gpu-prod
 #SBATCH --gres=gpu:h100:1
@@ -10,8 +10,11 @@
 # Eady LES SYPD benchmark, paper production resolution (1024×1024×64, WENO(9)),
 # adaptive Δt with a 5-day spinup so the wizard equilibrates before measurement.
 #
-# Wall budget: at sec/iter ≈ 0.3 on H100 and an equilibrated Δt around 5–15 s
-# under cfl=0.7, a 5-day spinup is ~3–4 h of wall time. We request 6 h.
+# Wall budget: on tagged Oceananigans 0.107.5 we observe sec/iter ≈ 0.8 at
+# production resolution (the WENO enum-bias regression that
+# glw/bench-weno-enum-bias was created to measure). With an equilibrated Δt
+# around 5–10 s once MLI saturates, the 5-day spinup is ~9–10 h of wall.
+# We request 12 h to give margin.
 # Override knobs (see benchmarks/README.md): EADY_NX/NY/NZ, EADY_LX/LZ,
 # EADY_SPINUP_DAYS, EADY_CFL, EADY_DT0, EADY_MAX_DT.
 
