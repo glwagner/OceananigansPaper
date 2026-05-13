@@ -26,11 +26,16 @@ echo
 
 cd /shared/home/greg/Projects/OceananigansPaper
 
-# stdbuf line-buffers Julia's stdout/stderr so Slurm's --output file updates
-# live; without it Julia block-buffers when stdout is a file and the spinup
-# looks like a hang.
-stdbuf -oL -eL julia --project benchmarks/eady_les_benchmark.jl
+# Wrap Julia in a PTY (`script -q -e -c ... /dev/null`) so its stdout/stderr
+# is line-buffered even though Slurm redirects --output to a regular file.
+# Plain `stdbuf -oL` doesn't help here: Julia's logging goes through libuv,
+# not libc stdio, so stdbuf's LD_PRELOAD shim never sees it. Without the PTY,
+# Julia block-buffers the entire spinup phase and the slurm log shows nothing
+# until the process exits — indistinguishable from a hang.
+set +e
+script -q -e -c "julia --project benchmarks/eady_les_benchmark.jl" /dev/null
 RC=$?
+set -e
 
 echo
 echo "=== DONE rc=$RC ==="; date
