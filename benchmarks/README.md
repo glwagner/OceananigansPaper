@@ -18,7 +18,7 @@ Each run produces a JSON summary at `benchmarks/runs/<name>_<jobid>.json`.
 ## Files
 
 - `sypd_harness.jl` — shared helper. Defines `measure_sypd!(simulation; ...)`.
-- `eady_les_benchmark.jl` — Sim 1 (paper config: 1000×1000×64, WENO(9), single H100).
+- `eady_les_benchmark.jl` — Sim 1 (paper production config: 1024×1024×64, WENO(9), single H100). Spins up for `EADY_SPINUP_DAYS` days of physical time under `conjure_time_step_wizard!` before invoking `measure_sypd!`, so the reported mean Δt reflects the equilibrated front-MLI cascade rather than the slow startup ramp.
 - `flow_past_headland_benchmark.jl` — Sim 3 (paper config: 384×128×64, WENO(9), single H100).
 - `global_simulation_benchmark.jl` — global ocean–sea-ice at the listing's 1° config (1440×560×40, single H100). Needs `ECCO_USERNAME` + `ECCO_WEBDAV_PASSWORD` env vars.
 - `runs/` — per-job JSON summaries (gitignored).
@@ -28,11 +28,9 @@ Each run produces a JSON summary at `benchmarks/runs/<name>_<jobid>.json`.
 From the repo root, on the AWS pcluster head node:
 
 ```bash
-# Eady
-BENCH_FILE=benchmarks/eady_les_benchmark.jl \
-  sbatch --job-name=bench-eady \
-         --export=ALL,BENCH_FILE=benchmarks/eady_les_benchmark.jl \
-         scripts/run_benchmark.batch
+# Eady (production resolution, ~3–4 h wall — uses the dedicated batch script
+# with a longer walltime budget than run_benchmark.batch)
+sbatch scripts/benchmark_eady.batch
 
 # Headland
 BENCH_FILE=benchmarks/flow_past_headland_benchmark.jl \
@@ -56,9 +54,13 @@ a single H100 (`--gres=gpu:1`).
 |---|---|---|
 | `BENCHMARK_WARMUP_ITERS` | 50 | iterations run untimed before measurement |
 | `BENCHMARK_TIMED_ITERS` | 200 | iterations measured |
-| `EADY_NX`, `EADY_NY`, `EADY_NZ` | 1000, 1000, 64 | Eady grid |
-| `EADY_LX`, `EADY_LZ` | 4000, 128 (m) | Eady domain |
+| `EADY_NX`, `EADY_NY`, `EADY_NZ` | 1024, 1024, 64 | Eady grid |
+| `EADY_LX`, `EADY_LZ` | 4096, 128 (m) | Eady domain |
 | `EADY_WENO` | 9 | Eady advection order |
+| `EADY_DT0` | 30 (s) | seed Δt for the wizard |
+| `EADY_MAX_DT` | 120 (s) | wizard `max_Δt` cap (finite; otherwise near-quiescent startup grows Δt to NaN) |
+| `EADY_CFL` | 0.7 | wizard CFL target |
+| `EADY_SPINUP_DAYS` | 5 | physical days of adaptive-Δt integration before measure_sypd! |
 | `HEADLAND_NZ` | 64 | Headland vertical resolution (grid scales 6Nz × 2Nz × Nz) |
 | `GLOBAL_NX`, `GLOBAL_NY`, `GLOBAL_NZ` | 1440, 560, 40 | global grid |
 | `GLOBAL_DT_MIN` | 5 | global Δt in minutes |

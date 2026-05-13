@@ -1,0 +1,37 @@
+#!/bin/bash
+#SBATCH --job-name=bench-eady
+#SBATCH --output=scripts/logs/bench-eady-%j.log
+#SBATCH --time=06:00:00
+#SBATCH --nodes=1
+#SBATCH --partition=gpu-prod
+#SBATCH --gres=gpu:h100:1
+#SBATCH --mem=64G
+
+# Eady LES SYPD benchmark, paper production resolution (1024×1024×64, WENO(9)),
+# adaptive Δt with a 5-day spinup so the wizard equilibrates before measurement.
+#
+# Wall budget: at sec/iter ≈ 0.3 on H100 and an equilibrated Δt around 5–15 s
+# under cfl=0.7, a 5-day spinup is ~3–4 h of wall time. We request 6 h.
+# Override knobs (see benchmarks/README.md): EADY_NX/NY/NZ, EADY_LX/LZ,
+# EADY_SPINUP_DAYS, EADY_CFL, EADY_DT0, EADY_MAX_DT.
+
+set -euo pipefail
+export PATH="$HOME/.juliaup/bin:$PATH"
+export JULIA_CPU_TARGET="generic"
+
+echo "=== Eady LES benchmark (production resolution, adaptive Δt) ==="
+hostname; date
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+echo
+
+cd /shared/home/greg/Projects/OceananigansPaper
+
+# stdbuf line-buffers Julia's stdout/stderr so Slurm's --output file updates
+# live; without it Julia block-buffers when stdout is a file and the spinup
+# looks like a hang.
+stdbuf -oL -eL julia --project benchmarks/eady_les_benchmark.jl
+RC=$?
+
+echo
+echo "=== DONE rc=$RC ==="; date
+exit $RC
