@@ -28,8 +28,15 @@ echo
 
 cd /shared/home/greg/Projects/OceananigansPaper
 
-julia --project "$BENCH_FILE"
+# Wrap Julia in a PTY (`script -q -e -c ... /dev/null`) so its stdout/stderr
+# is line-buffered even though Slurm redirects --output to a regular file.
+# Plain stdbuf doesn't help: Julia logs via libuv, not libc stdio. Without a
+# PTY, multi-hour spinup phases buffer to memory and the slurm log looks like
+# a hang. See PR #21 / commit 90fdc3f.
+set +e
+script -q -e -c "julia --project $BENCH_FILE" /dev/null
 RC=$?
+set -e
 
 echo
 echo "=== DONE rc=$RC ==="

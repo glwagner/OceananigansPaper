@@ -1,0 +1,33 @@
+#!/bin/bash
+#SBATCH --job-name=vert-mix-fig
+#SBATCH --output=scripts/logs/vert-mix-fig-%j.log
+#SBATCH --time=00:30:00
+#SBATCH --nodes=1
+#SBATCH --partition=gpu-prod
+#SBATCH --gres=gpu:h100:1
+#SBATCH --mem=32G
+
+# Regenerates listings/vertical_mixing_parameterizations.jl's output PNG.
+# 3D LES on H100 (64×64×64, WENO(9), 2 sim-days) + three 1D parameterized
+# columns. ~5-10 min wall.
+
+set -euo pipefail
+export PATH="$HOME/.juliaup/bin:$PATH"
+export JULIA_CPU_TARGET="generic"
+
+echo "=== Vertical mixing figure ==="
+hostname; date
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+echo
+
+cd /shared/home/greg/Projects/OceananigansPaper
+
+# PTY wrapper so Julia's stdout/stderr is line-buffered (see PR #21 / 90fdc3f).
+set +e
+script -q -e -c "julia --project listings/vertical_mixing_parameterizations.jl" /dev/null
+RC=$?
+set -e
+
+echo
+echo "=== DONE rc=$RC ==="; date
+exit $RC

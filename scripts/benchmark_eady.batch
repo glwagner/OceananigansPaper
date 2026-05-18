@@ -1,0 +1,48 @@
+#!/bin/bash
+#SBATCH --job-name=bench-eady
+#SBATCH --output=scripts/logs/bench-eady-%j.log
+#SBATCH --time=24:00:00
+#SBATCH --nodes=1
+#SBATCH --partition=gpu-prod
+#SBATCH --gres=gpu:h100:1
+#SBATCH --mem=64G
+
+# Eady LES SYPD benchmark, paper production resolution (1024×1024×64, WENO(9)),
+# adaptive Δt with a 5-day spinup so the wizard equilibrates before measurement.
+#
+# Wall budget: on tagged Oceananigans 0.107.4 we observe sec/iter ≈ 1.0 at
+# production resolution (the WENO enum-bias regression that
+# glw/bench-weno-enum-bias was created to measure). At the default 5-day
+# spinup, Δt is still dominated by the background u_bg = Λz advection
+# (~21 s) because perturbations haven't yet caught up; SYPD then reflects
+# the linear-growth phase, not the saturated MLI cascade. To see MLI-set
+# Δt we need EADY_SPINUP_DAYS ≈ 12–14, which can run 20+ h wall. We
+# request 24 h to cover both regimes.
+# Override knobs (see benchmarks/README.md): EADY_NX/NY/NZ, EADY_LX/LZ,
+# EADY_SPINUP_DAYS, EADY_CFL, EADY_DT0, EADY_MAX_DT.
+
+set -euo pipefail
+export PATH="$HOME/.juliaup/bin:$PATH"
+export JULIA_CPU_TARGET="generic"
+
+echo "=== Eady LES benchmark (production resolution, adaptive Δt) ==="
+hostname; date
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+echo
+
+cd /shared/home/greg/Projects/OceananigansPaper
+
+# Wrap Julia in a PTY (`script -q -e -c ... /dev/null`) so its stdout/stderr
+# is line-buffered even though Slurm redirects --output to a regular file.
+# Plain `stdbuf -oL` doesn't help here: Julia's logging goes through libuv,
+# not libc stdio, so stdbuf's LD_PRELOAD shim never sees it. Without the PTY,
+# Julia block-buffers the entire spinup phase and the slurm log shows nothing
+# until the process exits — indistinguishable from a hang.
+set +e
+script -q -e -c "julia --project benchmarks/eady_les_benchmark.jl" /dev/null
+RC=$?
+set -e
+
+echo
+echo "=== DONE rc=$RC ==="; date
+exit $RC
