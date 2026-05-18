@@ -31,6 +31,7 @@ using Oceananigans.StokesDrifts: UniformStokesDrift
 using Oceananigans.Utils: launch!, prettysummary, @kernel, @index
 using Statistics: mean
 using Printf
+using Serialization
 using CUDA
 using CairoMakie
 
@@ -43,25 +44,29 @@ include(joinpath(@__DIR__, "_smoke_prelude.jl"))
 # ============================================================
 
 struct PacanowskiPhilanderVerticalDiffusivity{TD, FT} <: AbstractScalarDiffusivity{TD, VerticalFormulation, 1}
-    ν₀ :: FT
-    ν₁ :: FT
-    κ₀ :: FT
-    c  :: FT
-    n  :: FT
+    ν₀     :: FT
+    ν₁     :: FT
+    κ₀     :: FT
+    κ_conv :: FT   # convective-adjustment diffusivity, used when N² < 0
+    ν_conv :: FT   # convective-adjustment viscosity,   used when N² < 0
+    c      :: FT
+    n      :: FT
     maximum_diffusivity :: FT
     maximum_viscosity   :: FT
 end
 
 function PacanowskiPhilanderVerticalDiffusivity(time_discretization = VerticallyImplicitTimeDiscretization(),
                                                 FT = Float64;
-                                                ν₀ = 1e-4, ν₁ = 5e-3, κ₀ = 1e-5,
+                                                ν₀     = 1e-3, ν₁     = 1e-1, κ₀ = 1e-4,
+                                                κ_conv = 1.0,  ν_conv = 1.0,
                                                 c  = 5.0,  n  = 2.0,
                                                 maximum_diffusivity = Inf,
                                                 maximum_viscosity   = Inf)
     TD = typeof(time_discretization)
     return PacanowskiPhilanderVerticalDiffusivity{TD, FT}(
-        convert(FT, ν₀), convert(FT, ν₁), convert(FT, κ₀),
-        convert(FT, c),  convert(FT, n),
+        convert(FT, ν₀),     convert(FT, ν₁),     convert(FT, κ₀),
+        convert(FT, κ_conv), convert(FT, ν_conv),
+        convert(FT, c),      convert(FT, n),
         convert(FT, maximum_diffusivity), convert(FT, maximum_viscosity))
 end
 
@@ -89,7 +94,10 @@ end
 @inline function Riᶜᶜᶠ(i, j, k, grid, velocities, buoyancy, tracers)
     S² = shear_squaredᶜᶜᶠ(i, j, k, grid, velocities)
     N² = ∂z_b(i, j, k, grid, buoyancy, tracers)
-    S²_min = eps(eltype(grid))
+    # 1e-10 s⁻² is the typical "minimum shear squared" floor in OGCM Ri-based
+    # parameterizations — well above eps(Float64) so denom stays well-conditioned
+    # for the Float64 arithmetic in ν₁/denom^(n+1).
+    S²_min = convert(eltype(grid), 1e-10)
     return max(zero(grid), N²) / max(S², S²_min)
 end
 
@@ -106,12 +114,18 @@ end
 
 @kernel function compute_pp_diffusivities!(diffusivities, grid, closure, velocities, tracers, buoyancy)
     i, j, k = @index(Global, NTuple)
-    Ri = Riᶜᶜᶠ(i, j, k, grid, velocities, buoyancy, tracers)
-    ν₀, ν₁, κ₀ = closure.ν₀, closure.ν₁, closure.κ₀
-    c,  n      = closure.c,  closure.n
-    denom = 1 + c * Ri
-    νz = ν₀ + ν₁ / denom^n
-    κz = κ₀ + ν₁ / denom^(n + 1)
+    N² = ∂z_b(i, j, k, grid, buoyancy, tracers)
+    S² = shear_squaredᶜᶜᶠ(i, j, k, grid, velocities)
+    S²_min = convert(eltype(grid), 1e-10)
+    Ri = max(zero(grid), N²) / max(S², S²_min)
+    denom = 1 + closure.c * Ri
+    # Stable-stratification Pacanowski–Philander branch.
+    νz_stable = closure.ν₀ + closure.ν₁ / denom^closure.n
+    κz_stable = closure.κ₀ + closure.ν₀ / denom + closure.ν₁ / denom^(closure.n + 1)
+    # Convective adjustment: when N² < 0, switch to (ν_conv, κ_conv).
+    convecting = N² < 0
+    νz = ifelse(convecting, closure.ν_conv, νz_stable)
+    κz = ifelse(convecting, closure.κ_conv, κz_stable)
     νz = min(νz, closure.maximum_viscosity)
     κz = min(κz, closure.maximum_diffusivity)
     @inbounds diffusivities.νz[i, j, k] = νz
@@ -231,27 +245,47 @@ end
 # on CPU (each 1D, basically free).
 # ============================================================
 
-const N_LES = parse(Int, get(ENV, "VERT_MIX_N", "64"))
+const N_LES      = parse(Int, get(ENV, "VERT_MIX_N", "64"))
 const FIG_SUFFIX = get(ENV, "VERT_MIX_FIG_SUFFIX", "")
-@info "Running implicit LES on GPU (3D, $(N_LES)³, WENO(9))..."
-les_arch = CUDA.functional() ? GPU() : CPU()
-les_sim = boundary_layer_simulation(nothing, les_arch; les=true, N=N_LES)
+const LES_CACHE  = get(ENV, "VERT_MIX_LES_CACHE", "les_cache$(FIG_SUFFIX).jls")
+
+# LES profile cache: if the file exists, load it and skip the 3D run.
+# Otherwise run the LES and write the file. Lets PP/CATKE/k-ε iterations
+# avoid the ~30 min H100 LES once it's been computed once.
+les_profile = if isfile(LES_CACHE)
+    @info "Loading cached LES profile from $(LES_CACHE) (skipping 3D run)"
+    deserialize(LES_CACHE)
+else
+    @info "Running implicit LES on GPU (3D, $(N_LES)³, WENO(9))..."
+    les_arch = CUDA.functional() ? GPU() : CPU()
+    les_sim = boundary_layer_simulation(nothing, les_arch; les=true, N=N_LES)
+    p = let m = les_sim.model
+        b̄ = compute!(Field(Average(m.tracers.b,    dims=(1, 2))))
+        ū = compute!(Field(Average(m.velocities.u, dims=(1, 2))))
+        (z_b = Array(znodes(m.tracers.b)),
+         b   = Array(interior(b̄, 1, 1, :)),
+         z_u = Array(znodes(m.velocities.u)),
+         u   = Array(interior(ū, 1, 1, :)))
+    end
+    serialize(LES_CACHE, p)
+    @info "Saved LES profile cache to $(LES_CACHE)"
+    p
+end
 
 closures = ("CATKE"                => CATKEVerticalDiffusivity(),
             "k-ε"                  => TKEDissipationVerticalDiffusivity(),
-            "Pacanowski–Philander" => PacanowskiPhilanderVerticalDiffusivity(ν₁=5e-3, c=5.0))
+            "Pacanowski–Philander" => PacanowskiPhilanderVerticalDiffusivity())
 
-# Per-closure Δt overrides for the 1D parameterized runs. PP gets a tighter
-# Δt — the previous figure showed a strangely-shaped near-surface velocity,
-# which might be a stepping artifact rather than a closure-physics issue.
-const PP_DT = parse(Float64, get(ENV, "PP_DT_SECONDS", "30"))
-closure_Δt = Dict("Pacanowski–Philander" => PP_DT)
+# 1D parameterized runs use their own (typically coarser) vertical grid and
+# longer time-step than the LES — VerticallyImplicit closures don't have a
+# diffusive CFL, so Δt is bounded only by Coriolis / explicit advection.
+const N_1D = parse(Int,     get(ENV, "VERT_MIX_N_1D",       "32"))
+const DT_1D = parse(Float64, get(ENV, "VERT_MIX_DT_1D_MIN", "5")) * 60
 
 results = Dict{String, Any}()
 for (name, closure) in closures
-    Δt = get(closure_Δt, name, 60.0)
-    @info "Running 1D $(name) (Δt = $(Δt) s)..."
-    results[name] = boundary_layer_simulation(closure, CPU(); N=N_LES, Δt=Δt)
+    @info "Running 1D $(name) (N = $(N_1D), Δt = $(DT_1D) s)..."
+    results[name] = boundary_layer_simulation(closure, CPU(); N=N_1D, Δt=DT_1D)
 end
 
 # ============================================================
@@ -259,18 +293,7 @@ end
 # for the parameterized cases).
 # ============================================================
 
-function les_profiles(sim)
-    m = sim.model
-    # Average |> Field keeps the reduction on the GPU and is the Oceananigans
-    # idiom; the column is then a 1×1×Nz Field whose interior we move to CPU.
-    b̄ = compute!(Field(Average(m.tracers.b,    dims=(1, 2))))
-    ū = compute!(Field(Average(m.velocities.u, dims=(1, 2))))
-    bm = Array(interior(b̄, 1, 1, :))
-    um = Array(interior(ū, 1, 1, :))
-    z_b = Array(znodes(m.tracers.b))
-    z_u = Array(znodes(m.velocities.u))
-    return z_b, bm, z_u, um
-end
+les_profile_tuple(p) = (p.z_b, p.b, p.z_u, p.u)
 
 function param_profiles(sim)
     m   = sim.model
@@ -308,7 +331,7 @@ axu = Axis(fig[1, 2], xlabel="Zonal velocity (m s⁻¹)")
 axκ = Axis(fig[1, 3], xlabel="Tracer diffusivity (m² s⁻¹)",
                        xscale=log10, yaxisposition=:right, ylabel="z (m)")
 
-z_b_les, b_les, z_u_les, u_les = les_profiles(les_sim)
+z_b_les, b_les, z_u_les, u_les = les_profile_tuple(les_profile)
 lines!(axb, b_les, z_b_les, label="LES", color=:black, linewidth=3)
 lines!(axu, u_les, z_u_les,                color=:black, linewidth=3)
 # LES has no scalar tracer diffusivity (WENO provides implicit dissipation),
@@ -324,9 +347,10 @@ for (name, _) in closures
     if κ_field !== nothing
         z_f = znodes(κ_field)
         # Drop the bottom face (impenetrable boundary, κ=0 plotted as a spike
-        # on the log axis), and clip the rest to avoid log10(0).
+        # on the log axis) and the top face (surface boundary, similar issue).
+        # Clip the rest to avoid log10(0).
         κp  = max.(vec(interior(κ_field, 1, 1, :)), 1e-7)
-        lines!(axκ, κp[2:end], z_f[2:end], color=colors[name], linestyle=linestyles[name])
+        lines!(axκ, κp[2:end-1], z_f[2:end-1], color=colors[name], linestyle=linestyles[name])
     end
 end
 
